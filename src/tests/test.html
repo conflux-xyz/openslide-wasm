@@ -1,0 +1,14 @@
+<html>
+  <head>
+    <script language="javascript" type="module">
+      import OpenSlide from "./openslide.js";
+      async function run() {
+        window.OpenSlide = OpenSlide;
+      }
+      document.addEventListener("DOMContentLoaded", () => {
+        run();
+      });
+    </script>
+  </head>
+  <body></body>
+</html>

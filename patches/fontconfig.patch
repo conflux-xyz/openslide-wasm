@@ -1,0 +1,13 @@
+diff --git a/src/meson.build b/src/meson.build
+index 34ccd8c..3926f1d 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -35,7 +35,7 @@ if cc.get_id() == 'gcc'
+   cpp += ['-E', '-P']
+ elif cc.get_id() == 'msvc'
+   cpp += ['/EP']
+-elif cc.get_id() == 'clang'
++elif cc.get_id() == 'clang' or cc.get_id() == 'emscripten'
+   cpp += ['-E', '-P']
+ else
+   error('FIXME: implement cc.preprocess')

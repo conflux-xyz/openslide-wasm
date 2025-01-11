@@ -1,0 +1,43 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+      - scratch
+  pull_request:
+
+jobs:
+  conflux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CONFLUX_REPO }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CONFLUX_REPO }}
+          aws-region: us-west-2
+      - name: Download external dependencies
+        run: aws s3 cp s3://conflux-public-data-staging/openslide/external.tar.gz external.tar.gz --quiet
+      - name: Build wasm library
+        run: |
+          rm -rf dist
+          mkdir dist
+          tar -xzf external.tar.gz
+          docker build -t wasm-build .
+          docker run -v .:/src wasm-build ./build.sh
+      - name: Check build success
+        run: |
+          cd src/dist
+          if [ ! -f openslide-api.js ]; then exit -1; fi
+      - name: Build Typescript & run tests
+        run: |
+          cd src
+          yarn install
+          yarn build
+          cd dist
+          if [ ! -f openslide.js ]; then exit -1; fi

@@ -1,0 +1,284 @@
+diff --git a/gdk-pixbuf/gdk-pixbuf-io.c b/gdk-pixbuf/gdk-pixbuf-io.c
+index e1df5900f..ee81cc544 100644
+--- a/gdk-pixbuf/gdk-pixbuf-io.c
++++ b/gdk-pixbuf/gdk-pixbuf-io.c
+@@ -377,184 +377,7 @@ static gboolean
+ gdk_pixbuf_io_init_modules (const char  *filename,
+                             GError     **error)
+ {
+-#ifdef USE_GMODULE
+-        GIOChannel *channel;
+-        gchar *line_buf;
+-        gsize term;
+-        GString *tmp_buf = g_string_new (NULL);
+-        gboolean have_error = FALSE;
+-        GdkPixbufModule *module = NULL;
+-        int flags = 0;
+-        int n_patterns = 0;
+-        GdkPixbufModulePattern *pattern;
+-        GError *local_error = NULL;
+-        guint num_formats;
+-
+-        channel = g_io_channel_new_file (filename, "r",  &local_error);
+-        if (!channel) {
+-                char *filename_utf8 = g_filename_display_name (filename);
+-                g_set_error (error,
+-                             G_IO_ERROR,
+-                             G_IO_ERROR_INVALID_ARGUMENT,
+-                             "Cannot open pixbuf loader module file '%s': %s\n\n"
+-                             "This likely means that your installation is broken.\n"
+-                             "Try running the command\n"
+-                             "  gdk-pixbuf-query-loaders > %s\n"
+-                             "to make things work again for the time being.",
+-                             filename_utf8, local_error->message, filename_utf8);
+-                g_clear_error (&local_error);
+-                g_string_free (tmp_buf, TRUE);
+-                g_free (filename_utf8);
+-                return FALSE;
+-        }
+-
+-        num_formats = g_slist_length (file_formats);
+-        
+-        while (!have_error && g_io_channel_read_line (channel, &line_buf, NULL, &term, NULL) == G_IO_STATUS_NORMAL) {
+-                const char *p;
+-                
+-                p = line_buf;
+ 
+-                line_buf[term] = 0;
+-
+-                if (!skip_space (&p)) {
+-                        /* Blank line marking the end of a module */
+-                        if (module && *p != '#') {
+-                                file_formats = g_slist_prepend (file_formats, module);
+-                                module = NULL;
+-                        }
+-                        
+-                        goto next_line;
+-                }
+-
+-                if (*p == '#') 
+-                        goto next_line;
+-                
+-                if (!module) {
+-                        /* Read a module location */
+-                        module = g_new0 (GdkPixbufModule, 1);
+-                        n_patterns = 0;
+-                        
+-                        if (!scan_string (&p, tmp_buf)) {
+-                                g_warning ("Error parsing loader info in '%s'\n  %s", 
+-                                           filename, line_buf);
+-                                have_error = TRUE;
+-                        }
+-                        module->module_path = build_module_path (tmp_buf->str);
+-                }
+-                else if (!module->module_name) {
+-                        module->info = g_new0 (GdkPixbufFormat, 1);
+-                        if (!scan_string (&p, tmp_buf)) {
+-                                g_warning ("Error parsing loader info in '%s'\n  %s", 
+-                                           filename, line_buf);
+-                                have_error = TRUE;
+-                        }
+-                        module->info->name =  g_strdup (tmp_buf->str);
+-                        module->module_name = module->info->name;
+-
+-                        flags = 0;
+-                        if (!scan_int (&p, &flags)) {
+-                                g_warning ("Error parsing loader info in '%s'\n  %s", 
+-                                           filename, line_buf);
+-                                have_error = TRUE;
+-                        }
+-                        module->info->flags = flags;
+-                        
+-                        if (!scan_string (&p, tmp_buf)) {
+-                                g_warning ("Error parsing loader info in '%s'\n  %s", 
+-                                           filename, line_buf);
+-                                have_error = TRUE;
+-                        }                       
+-                        if (tmp_buf->str[0] != 0)
+-                                module->info->domain = g_strdup (tmp_buf->str);
+-
+-                        if (!scan_string (&p, tmp_buf)) {
+-                                g_warning ("Error parsing loader info in '%s'\n  %s", 
+-                                           filename, line_buf);
+-                                have_error = TRUE;
+-                        }                       
+-                        module->info->description = g_strdup (tmp_buf->str);
+-
+-                        if (scan_string (&p, tmp_buf)) {
+-                                module->info->license = g_strdup (tmp_buf->str);
+-                        }
+-                }
+-                else if (!module->info->mime_types) {
+-                        int n = 1;
+-                        module->info->mime_types = g_new0 (gchar*, 1);
+-                        while (scan_string (&p, tmp_buf)) {
+-                                if (tmp_buf->str[0] != 0) {
+-                                        module->info->mime_types =
+-                                                g_realloc (module->info->mime_types, (n + 1) * sizeof (gchar*));
+-                                        module->info->mime_types[n - 1] = g_strdup (tmp_buf->str);
+-                                        module->info->mime_types[n] = NULL;
+-                                        n++;
+-                                }
+-                        }
+-                }
+-                else if (!module->info->extensions) {
+-                        int n = 1;
+-                        module->info->extensions = g_new0 (gchar*, 1);
+-                        while (scan_string (&p, tmp_buf)) {
+-                                if (tmp_buf->str[0] != 0) {
+-                                        module->info->extensions =
+-                                                g_realloc (module->info->extensions, (n + 1) * sizeof (gchar*));
+-                                        module->info->extensions[n - 1] = g_strdup (tmp_buf->str);
+-                                        module->info->extensions[n] = NULL;
+-                                        n++;
+-                                }
+-                        }
+-                }
+-                else {
+-                        n_patterns++;
+-                        module->info->signature = (GdkPixbufModulePattern *)
+-                                g_realloc (module->info->signature, (n_patterns + 1) * sizeof (GdkPixbufModulePattern));
+-                        pattern = module->info->signature + n_patterns;
+-                        pattern->prefix = NULL;
+-                        pattern->mask = NULL;
+-                        pattern->relevance = 0;
+-                        pattern--;
+-                        if (!scan_string (&p, tmp_buf))
+-                                goto context_error;
+-                        pattern->prefix = g_strdup (tmp_buf->str);
+-                        
+-                        if (!scan_string (&p, tmp_buf))
+-                                goto context_error;
+-                        if (*tmp_buf->str)
+-                                pattern->mask = g_strdup (tmp_buf->str);
+-                        else
+-                                pattern->mask = NULL;
+-                        
+-                        if (!scan_int (&p, &pattern->relevance))
+-                                goto context_error;
+-                        
+-                        goto next_line;
+-
+-                context_error:
+-                        g_free (pattern->prefix);
+-                        g_free (pattern->mask);
+-                        g_free (pattern);
+-                        g_warning ("Error parsing loader info in '%s'\n  %s", 
+-                                   filename, line_buf);
+-                        have_error = TRUE;
+-                }
+-        next_line:
+-                g_free (line_buf);
+-        }
+-        g_string_free (tmp_buf, TRUE);
+-        g_io_channel_unref (channel);
+-
+-        if (g_slist_length (file_formats) <= num_formats) {
+-                char *filename_utf8 = g_filename_display_name (filename);
+-                g_set_error (error,
+-                             G_IO_ERROR,
+-                             G_IO_ERROR_NOT_INITIALIZED,
+-                             "No new GdkPixbufModule loaded from '%s'",
+-                             filename_utf8);
+-                g_free (filename_utf8);
+-                return FALSE;
+-        }
+-#endif
+         return TRUE;
+ }
+ 
+diff --git a/gdk-pixbuf/meson.build b/gdk-pixbuf/meson.build
+index 570625bfe..a9a60a5b6 100644
+--- a/gdk-pixbuf/meson.build
++++ b/gdk-pixbuf/meson.build
+@@ -279,75 +279,6 @@ meson.override_dependency('gdk-pixbuf-2.0', gdkpixbuf_dep)
+ dynamic_loaders = []
+ dynamic_loaders_dep = []
+ 
+-foreach name, loader: loaders
+-  sources = loader.get('sources', [])
+-  cond = loader.get('enabled', true)
+-  cflags = loader.get('c_args', [])
+-  name_suffix = []
+-
+-  # FIXME: workaround for https://gitlab.gnome.org/GNOME/glib/issues/1413
+-  if host_system == 'darwin'
+-    name_suffix = 'so'
+-  endif
+-
+-  if cond and not (builtin_loaders.contains(name) or builtin_all_loaders)
+-    mod = shared_module('pixbufloader-@0@'.format(name),
+-                        sources,
+-                        gdkpixbuf_enum_h,
+-                        dependencies: loaders_deps + gdk_pixbuf_deps + [ gdkpixbuf_dep ],
+-                        include_directories: [ root_inc, gdk_pixbuf_inc ],
+-                        c_args: common_cflags + gdk_pixbuf_cflags + cflags,
+-                        name_suffix: name_suffix,
+-                        install: true,
+-                        install_dir: gdk_pixbuf_loaderdir)
+-
+-    # We need the path to build loaders.cache for tests
+-    dynamic_loaders += mod.full_path()
+-    dynamic_loaders_dep += mod
+-  endif
+-endforeach
+-
+-# Build the loaders using native Windows components as dynamic modules, if requested
+-if native_windows_loaders
+-  if not (builtin_loaders.contains('windows') or builtin_all_loaders)
+-    foreach loader: windows_native_loader_formats
+-      loader_sources = windows_base_loader_sources + [ 'io-gdip-@0@.c'.format(loader) ]
+-
+-      mod = shared_module('pixbufloader-gdip-@0@'.format(loader),
+-                          loader_sources,
+-                          gdkpixbuf_enum_h,
+-                          dependencies: loaders_deps + gdk_pixbuf_deps + [ gdkpixbuf_dep ],
+-                          include_directories: [ root_inc, gdk_pixbuf_inc ],
+-                          c_args: common_cflags + gdk_pixbuf_cflags + cflags,
+-                          install: true,
+-                          install_dir: gdk_pixbuf_loaderdir)
+-      dynamic_loaders += mod.full_path()
+-      dynamic_loaders_dep = mod
+-    endforeach
+-  endif
+-endif
+-
+-gdkpixbuf_bin = [
+-  [ 'gdk-pixbuf-csource' ],
+-  [ 'gdk-pixbuf-pixdata' ],
+-  [ 'gdk-pixbuf-query-loaders', [ 'queryloaders.c' ] ],
+-]
+-
+-foreach bin: gdkpixbuf_bin
+-  bin_name = bin[0]
+-  bin_source = bin.get(1, bin_name + '.c')
+-
+-  bin = executable(bin_name, bin_source,
+-                   gdkpixbuf_enum_h,
+-                   dependencies: gdk_pixbuf_deps + [ gdkpixbuf_dep ],
+-                   include_directories: [ root_inc, gdk_pixbuf_inc ],
+-                   c_args: common_cflags + gdk_pixbuf_cflags,
+-                   install: true)
+-  meson.override_find_program(bin_name, bin)
+-
+-  # Used in tests
+-  set_variable(bin_name.underscorify(), bin)
+-endforeach
+ 
+ if not meson.is_cross_build()
+   # The 'loaders.cache' used for testing, so we don't accidentally
+diff --git a/meson.build b/meson.build
+index 3eb3fcc15..837eff2bf 100644
+--- a/meson.build
++++ b/meson.build
+@@ -398,8 +398,8 @@ if not meson.is_cross_build()
+ endif
+ 
+ # Documentation
+-build_docs = get_option('gtk_doc') or get_option('docs')
+-subdir('docs')
++build_docs = false
++
+ 
+ if not meson.is_cross_build()
+   meson.add_install_script('build-aux/post-install.py',

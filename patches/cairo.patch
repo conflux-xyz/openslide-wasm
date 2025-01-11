@@ -1,0 +1,12 @@
+diff --git a/meson.build b/meson.build
+index 12512d1..06cb597 100644
+--- a/meson.build
++++ b/meson.build
+@@ -803,7 +803,6 @@ else
+   cairoboilerplate_dep = dependency('', required: false)
+ endif
+ 
+-subdir('util')
+ 
+ if not get_option('tests').disabled() and feature_conf.get('CAIRO_HAS_PNG_FUNCTIONS', 0) == 1
+   subdir('test')
