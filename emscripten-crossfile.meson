@@ -5,7 +5,6 @@ ld = 'wasm-ld'
 ar = 'emar'
 ranlib = 'emranlib'
 pkgconfig = ['emconfigure', 'pkg-config']
-python = '/Users/saliksyed/.pyenv/shims/python3.9'
 # https://docs.gtk.org/glib/cross-compiling.html#cross-properties
 [properties]
 growing_stack = true

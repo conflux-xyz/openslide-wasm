@@ -1,0 +1,35 @@
+diff --git a/glib/giochannel.h b/glib/giochannel.h
+index 913019c..1859de1 100644
+--- a/glib/giochannel.h
++++ b/glib/giochannel.h
+@@ -326,9 +326,6 @@ GLIB_AVAILABLE_IN_ALL
+ gint        g_io_channel_unix_get_fd (GIOChannel *channel);
+ 
+ 
+-/* Hook for GClosure / GSource integration. Don't touch */
+-GLIB_VAR GSourceFuncs g_io_watch_funcs;
+-
+ #ifdef G_OS_WIN32
+ 
+ /* You can use this "pseudo file descriptor" in a GPollFD to add
+diff --git a/gobject/gsourceclosure.c b/gobject/gsourceclosure.c
+index 4b79b13..e224e77 100644
+--- a/gobject/gsourceclosure.c
++++ b/gobject/gsourceclosure.c
+@@ -199,7 +199,7 @@ closure_callback_get (gpointer     cb_data,
+ 
+   if (!closure_callback)
+     {
+-      if (source->source_funcs == &g_io_watch_funcs)
++      if (FALSE)
+         closure_callback = (GSourceFunc)io_watch_closure_callback;
+       else if (source->source_funcs == &g_child_watch_funcs)
+         closure_callback = (GSourceFunc)g_child_watch_closure_callback;
+@@ -256,7 +256,6 @@ g_source_set_closure (GSource  *source,
+       source->source_funcs != &g_unix_signal_funcs &&
+ #endif
+       source->source_funcs != &g_child_watch_funcs &&
+-      source->source_funcs != &g_io_watch_funcs &&
+       source->source_funcs != &g_timeout_funcs &&
+       source->source_funcs != &g_idle_funcs)
+     {
