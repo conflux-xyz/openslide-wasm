@@ -29,8 +29,9 @@ jobs:
             mkdir dist
             tar -xzf external.tar.gz
             docker build -t wasm-build .
-            docker run -v dist:/dist wasm-build /bin/bash ./build.sh
+            docker run -v ./dist:/dist wasm-build
       - name: Check build success
         run: |
-            if [ ! -f dist/api.wasm ]; then exit -1 fi
-            if [ ! -f dist/api.js ]; then exit -1 fi
+            cd dist
+            if [ ! -f api.wasm ]; then exit -1; fi
+            if [ ! -f api.js ]; then exit -1; fi
