@@ -1,17 +1,53 @@
-# Openslide Web Assembly
+# Openslide.js
 
-The project compiles [Openslide](https://openslide.org/), along with its dependencies, to web assembly using [Emscripten](https://emscripten.org/). There are also additional Typescript wrappers for common slide operations such as file loading and tile fetching.
+Openslide WASM is a Javascript library wrapping Openslide via webassembly. With this library you can load images in any format that Openslide supports, read metadata and load image regions within a web browser.
 
-## Building from scratch
+The project compiles [Openslide](https://openslide.org/), along with its dependencies, to web assembly using [Emscripten](https://emscripten.org/). There are also additional Javascript wrappers for common slide operations such as file loading and tile fetching.
+
+## Getting Started
+To use the library you just need to add the files in the `/dist` directory to you web project. You can also look in the example folder for a complete setup, including a python server and sample SVS to try it out. 
+
+
+Here are a few examples to give you an idea of how the library works: 
+
+## Limitations
+Openslide.js uses `SharedArrayBuffer`, so any website it is included in *cannot* make cross-origin requests. This might require image viewing features to be hosted in an iframe. Take a look at `src/server.py` for an example on the necessary headers for running the script. This [article](https://blog.logrocket.com/understanding-sharedarraybuffer-and-cross-origin-isolation/) provides some helpful context.
+
+
+## Build using Docker
 To build the project follow these steps:
 1. Load dependencies. You can either extract the included tar (`tar -xvzf external.tar.gz`) or run the `get_external_deps.sh` script. 
 
 2. Build the Docker build environment. We have included all the build tools necessary (e.g Emscripten, Meson) in this container: `docker build -t wasm-build .`
 
-3. Login to the container `docker run -it -v dist:/dist wasm-build /bin/bash` 
+3. Run the container `docker run -it -v dist:/dist wasm-build /bin/bash ./build.sh` 
 
-4. Run the build script inside the container `./build.sh`
 
 NOTE: The initial build can take an hour or more complete. You may see errors or warnings relating to CMake configuration, you can ignore these.
 
-## Using the library
+## Build locally
+1. Install the build tools below:
+    * emscripten
+    * Python 3.9 (python3 python3-pip python3-setuptools python3-wheel)
+    * Meson
+    * autoconf 
+    * automake 
+    * libtool 
+    * libglib2.0-dev-bin 
+    * pkg-config  
+    * ninja-build
+
+2. Edit `emscripten-crossfile.meson` to point to your python path under the `[binaries]` section:
+    ```
+    [binaries]
+    python = '/usr/bin/python3.9'
+    ...
+    ```
+
+3. Load dependencies. You can either extract the included tar (`tar -xvzf external.tar.gz`) or run the `get_external_deps.sh` script. 
+
+4. Run the build command: 
+    ```
+    EMSCRIPTEN_PATH=<your emscripten install directory> SOURCE_HOME=$(pwd) ./build.sh
+    ```
+

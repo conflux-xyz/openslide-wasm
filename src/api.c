@@ -54,24 +54,6 @@ void free_result(char* ptr) {
 EMSCRIPTEN_KEEPALIVE
 char* read_region(char *ptr, int64_t x, int64_t y, int32_t level, int64_t w, int64_t h) {
     char *buffer = malloc(w * h * 4);
-    openslide_read_region((openslide_t*)ptr, buffer, x, y, 0, PREVIEW_SIZE, PREVIEW_SIZE);
+    openslide_read_region((openslide_t*)ptr, buffer, x, y, 0, w, h);
     return buffer;
-}
-
-
-int main() {
-
-
-    
-    openslide_t * img = openslide_open("sample.svs");
-    int PREVIEW_SIZE = 512;
-    uint32_t* buffer = malloc(sizeof(uint32_t) * PREVIEW_SIZE * PREVIEW_SIZE);
-    openslide_read_region(img, buffer, 4000, 4000, 0, PREVIEW_SIZE, PREVIEW_SIZE);
-    for(int j = 0; j < PREVIEW_SIZE; j++) {
-      for(int i = 0; i < PREVIEW_SIZE; i++) {
-        uint32_t color = buffer[i + j * PREVIEW_SIZE];
-        unsigned char* rgba = (unsigned char*)(&color);
-      }
-    }
-
 }

@@ -62,6 +62,7 @@ git apply ${SOURCE_HOME}/../patches/fontconfig.patch
 # cairo
 cd ${SOURCE_HOME}
 git clone --depth 1 --branch 1.17.8 https://gitlab.freedesktop.org/cairo/cairo.git
+git apply ${SOURCE_HOME}/../patches/cairo.patch
 
 # openjpeg
 cd ${SOURCE_HOME}
