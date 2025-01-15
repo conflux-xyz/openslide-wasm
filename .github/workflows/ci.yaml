@@ -22,14 +22,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CONFLUX_REPO }}
           aws-region: us-west-2
       - name: Download external data
-        run: aws s3 cp s3://conflux-public-data-staging/openslide/external.tar.gz external.tar.gz
+        run: aws s3 cp s3://conflux-public-data-staging/openslide/external.tar.gz external.tar.gz --quiet
       - name: Build wasm library
         run: |
             rm -rf dist
             mkdir dist
-            tar -xvzf external.tar.gz
+            tar -xzf external.tar.gz
             docker build -t wasm-build .
-            docker run -it -v dist:/dist wasm-build /bin/bash ./build.sh
+            docker run -v dist:/dist wasm-build /bin/bash ./build.sh
       - name: Check build success
         run: |
             if [ ! -f dist/api.wasm ]; then exit -1 fi
