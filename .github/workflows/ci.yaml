@@ -22,7 +22,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CONFLUX_REPO }}
           aws-region: us-west-2
       - name: Download external data
-        run: aws s3 cp s3://openslide-wasm-build/external.tar.gz external.tar.gz
+        run: aws s3 cp s3://conflux-public-data-staging/openslide/external.tar.gz external.tar.gz
       - name: Build wasm library
         run: |
             rm -rf dist
