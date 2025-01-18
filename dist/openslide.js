@@ -9,18 +9,17 @@ function loadFile(ctx, file) {
   return new Promise((resolve, _) => {
     const chunkSize = 64 * 1024 * 1024;
     function writeToWasm(file, offset, chunkSize, filename) {
-      console.log(file);
       const reader = new FileReader();
       const chunk = file.slice(offset, offset + chunkSize);
       reader.onload = function (event) {
         const arrayBuffer = event.target.result;
         const uint8Array = new Uint8Array(arrayBuffer);
         if (offset === 0) {
-          ctx.FS_createDataFile("/", filename, uint8Array, true, true);
+          ctx.FS.createDataFile("/", filename, uint8Array, true, true);
         } else {
-          const stream = ctx.FS_open("/" + filename, "a+");
-          ctx.FS_write(stream, uint8Array, 0, uint8Array.length);
-          ctx.FS_close(stream);
+          const stream = ctx.FS.open("/" + filename, "a+");
+          ctx.FS.write(stream, uint8Array, 0, uint8Array.length);
+          ctx.FS.close(stream);
         }
         offset += chunkSize;
         if (offset < file.size) {
@@ -29,7 +28,6 @@ function loadFile(ctx, file) {
           resolve(filename);
         }
       };
-
       reader.onerror = function (error) {
         console.error("Error reading file chunk:", error);
       };
@@ -169,7 +167,7 @@ function OpenslideContext(ctx) {
   };
 }
 
-async function Openslide(callback) {
+async function Openslide() {
   return new Promise(async (resolve, reject) => {
     const scripts = ["api.js"];
     const promises = scripts.map((file) => {
@@ -187,7 +185,6 @@ async function Openslide(callback) {
     await Promise.all(promises);
     Module.onRuntimeInitialized = () => {
       const ctx = OpenslideContext(Module);
-      if (callback) callback(ctx);
       resolve(ctx);
     };
   });

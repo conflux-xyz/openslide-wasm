@@ -192,7 +192,7 @@ echo 'openslide found. Skipping build.';
 fi
 # Build openslide wasm
 cd ${DEPS_DIRECTORY}
-(emcc -s FORCE_FILESYSTEM -s EXPORTED_FUNCTIONS="[ '_malloc']" -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
+(emcc -s FORCE_FILESYSTEM -s EXPORTED_FUNCTIONS="[ '_malloc', 'FS_open']" -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
       ../src/api.c -o api.html) || { echo 'openslide-wasm build failed'; exit 1; }
 
 cp ${DEPS_DIRECTORY}/api.wasm /src/dist/api.wasm
