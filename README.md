@@ -5,7 +5,7 @@ Openslide WASM is a Javascript library wrapping Openslide via webassembly. With 
 The project compiles [Openslide](https://openslide.org/), along with its dependencies, to web assembly using [Emscripten](https://emscripten.org/). There are also additional Javascript wrappers for common slide operations such as file loading and tile fetching.
 
 ## Getting Started
-To use the library you just need to add the files in the `/dist` directory to your web project. You can also look in the example folder for a complete setup, including a python server and sample SVS to try it out. 
+To use the library you just need to add the files in the `/dist` directory to your web project and add `openslide.js` in a script tag in your HTML file. The example folder has a complete setup, including a python server and sample SVS to play with. 
 
 ```javascript
 async function run() {
@@ -19,8 +19,6 @@ async function run() {
 run();
 
 ```
-
-Here are a few examples to give you an idea of how the library works: 
 
 ## Limitations
 Openslide.js uses `SharedArrayBuffer`, so any website it is included in *cannot* make cross-origin requests. This might require image viewing features to be hosted in an iframe. Take a look at `src/server.py` for an example on the necessary headers for running the script. This [article](https://blog.logrocket.com/understanding-sharedarraybuffer-and-cross-origin-isolation/) provides some helpful context.
