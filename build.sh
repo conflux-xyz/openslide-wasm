@@ -129,7 +129,7 @@ cd ${DEPS_DIRECTORY}/openslide
 
 # Build openslide wasm
 cd ${DEPS_DIRECTORY}
-(emcc -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
+(emcc -s FORCE_FILESYSTEM -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
       ../src/api.c -o api.html) || { echo 'openslide-wasm build failed'; exit 1; }
 
 cp ${DEPS_DIRECTORY}/api.wasm /dist/api.wasm

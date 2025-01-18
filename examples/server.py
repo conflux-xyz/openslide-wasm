@@ -1,10 +1,24 @@
+import os
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 
-class CORPHandler(SimpleHTTPRequestHandler):
+class RequestHandler(SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        original_path = super().translate_path(path)
+        if os.path.exists(original_path):
+            return original_path
+        
+        # include files in /dist
+        dist_dir = os.path.abspath(os.path.join(os.getcwd(), "../dist/"))
+        print(dist_dir, path)
+        alternative_path = os.path.join(dist_dir, path.lstrip("/"))
+        if os.path.exists(alternative_path):
+            return alternative_path
+        return original_path
+
     def end_headers(self):
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         super().end_headers()
 
 if __name__ == "__main__":
-    HTTPServer(("localhost", 8000), CORPHandler).serve_forever()
+    HTTPServer(("localhost", 8000), RequestHandler).serve_forever()

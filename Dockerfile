@@ -7,4 +7,3 @@ COPY external ./external
 COPY build.sh .
 COPY emscripten-crossfile.meson .
 COPY src ./src
-CMD  /bin/bash build.sh

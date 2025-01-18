@@ -5,8 +5,20 @@ Openslide WASM is a Javascript library wrapping Openslide via webassembly. With 
 The project compiles [Openslide](https://openslide.org/), along with its dependencies, to web assembly using [Emscripten](https://emscripten.org/). There are also additional Javascript wrappers for common slide operations such as file loading and tile fetching.
 
 ## Getting Started
-To use the library you just need to add the files in the `/dist` directory to you web project. You can also look in the example folder for a complete setup, including a python server and sample SVS to try it out. 
+To use the library you just need to add the files in the `/dist` directory to your web project. You can also look in the example folder for a complete setup, including a python server and sample SVS to try it out. 
 
+```javascript
+async function run() {
+    const ctx = await Openslide();
+    const image = await ctx.open('sample.svs');
+    const numLevels = image.getLevelCount();
+    const dims = image.getLevelDimensions(0);
+    const canvas = document.getElementById("image");
+    image.drawToCanvas(canvas, Math.round(dims[0]/2), Math.round(dims[1]/2), 0, 512, 512);
+}
+run();
+
+```
 
 Here are a few examples to give you an idea of how the library works: 
 

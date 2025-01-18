@@ -4,7 +4,7 @@
 
 EMSCRIPTEN_KEEPALIVE
 char* load_image(const char* path) {
-    openslide_t * img = openslide_open("sample.svs");
+    openslide_t * img = openslide_open(path);
     return (char*) img;
 }
 
