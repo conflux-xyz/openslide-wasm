@@ -9,7 +9,6 @@ class RequestHandler(SimpleHTTPRequestHandler):
         
         # include files in /dist
         dist_dir = os.path.abspath(os.path.join(os.getcwd(), "../dist/"))
-        print(dist_dir, path)
         alternative_path = os.path.join(dist_dir, path.lstrip("/"))
         if os.path.exists(alternative_path):
             return alternative_path

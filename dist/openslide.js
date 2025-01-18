@@ -6,7 +6,7 @@ async function fetchFileFromUrl(url) {
 }
 
 function loadFile(ctx, file) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve, _) => {
     const chunkSize = 64 * 1024 * 1024;
     function writeToWasm(file, offset, chunkSize, filename) {
       console.log(file);
@@ -60,7 +60,34 @@ function cstring(str) {
 
 function OpenslideImage(ctx, ptr) {
   return {
-    getProperties: () => {},
+    getPropertyNames: () => {
+      const stringArr = ctx._get_property_names(ptr);
+      const memory = ctx.HEAPU8;
+      const result = [];
+      const charView = new Uint32Array(memory.buffer);
+      for (let i = 0; ; i++) {
+        const stringPtr = charView[(stringArr >> 2) + i];
+        if (stringPtr === 0) break;
+        let str = "";
+        for (let j = stringPtr; memory[j] !== 0; j++) {
+          str += String.fromCharCode(memory[j]);
+        }
+        result.push(str);
+      }
+      return result;
+    },
+    getPropertyValue: (name) => {
+      const nameCstr = cstring(name);
+      const memory = ctx.HEAPU8;
+      const stringPtr = ctx._get_property_value(ptr, nameCstr);
+      let str = "";
+      if (stringPtr === 0) return null;
+      for (let j = stringPtr; memory[j] !== 0; j++) {
+        str += String.fromCharCode(memory[j]);
+      }
+      ctx._free_result(nameCstr);
+      return str;
+    },
     getLevelCount: () => {
       return ctx._get_level_count(ptr);
     },
@@ -136,6 +163,7 @@ function OpenslideContext(ctx) {
       const filename = await loadFile(ctx, file);
       const path = cstring(filename);
       const img = ctx._load_image(path);
+      ctx._free_result(path);
       return OpenslideImage(ctx, img);
     },
   };

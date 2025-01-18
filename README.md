@@ -30,9 +30,11 @@ To build the project follow these steps:
 
 2. Build the Docker build environment. We have included all the build tools necessary (e.g Emscripten, Meson) in this container: `docker build -t wasm-build .`
 
-3. Run the container `docker run -v ./dist:/dist wasm-build` 
+3. Run the container `docker run -v .:/src wasm-build /bin/sh` 
 
-NOTE: The initial build can take an hour or more complete. You may see errors or warnings relating to CMake configuration, you can ignore these.
+4. Run the build script: `cd /src; ./build.sh`
+
+NOTE: The initial build can take 20-30 minutes to complete. Once the dependencies are compiled re-running the build script should be much faster.
 
 ## Build locally
 1. Install the build tools below:

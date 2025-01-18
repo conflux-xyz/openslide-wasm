@@ -14,6 +14,10 @@
         const image = await ctx.open("sample.svs");
         console.log(image);
         console.log(image.getLevelCount());
+        const properties = image.getPropertyNames();
+        properties.map(name => {
+          console.log(name, image.getPropertyValue(name));
+        })
         const dims = image.getLevelDimensions(0);
         const canvas = document.getElementById("image");
         image.drawToCanvas(canvas, 0, 0, 0, 512, 512);

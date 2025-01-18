@@ -57,3 +57,13 @@ char* read_region(char *ptr, int64_t x, int64_t y, int32_t level, int64_t w, int
     openslide_read_region((openslide_t*)ptr, buffer, x, y, 0, w, h);
     return buffer;
 }
+
+EMSCRIPTEN_KEEPALIVE
+char** get_property_names(char* ptr) {
+    return openslide_get_property_names((openslide_t*) ptr);
+}
+
+EMSCRIPTEN_KEEPALIVE
+char** get_property_value(char* ptr, char* property) {
+    return openslide_get_property_value((openslide_t*) ptr, property);
+}
