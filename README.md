@@ -14,7 +14,7 @@ async function run() {
     const numLevels = image.getLevelCount();
     const dims = image.getLevelDimensions(0);
     const canvas = document.getElementById("image");
-    image.drawToCanvas(canvas, Math.round(dims[0]/2), Math.round(dims[1]/2), 0, 512, 512);
+    image.drawToCanvas(canvas, 0, 0, 0, 512, 512);
 }
 run();
 
