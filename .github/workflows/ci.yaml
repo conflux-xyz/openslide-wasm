@@ -29,7 +29,7 @@ jobs:
           mkdir dist
           tar -xzf external.tar.gz
           docker build -t wasm-build .
-          docker run -v ./dist:/dist wasm-build
+          docker run -v .:/src wasm-build ./build.sh
       - name: Check build success
         run: |
           cd dist

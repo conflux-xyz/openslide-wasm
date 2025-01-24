@@ -1,6 +1,6 @@
 # Openslide.js
 
-Openslide WASM is a Javascript library wrapping Openslide via webassembly. With this library you can load images in any format that Openslide supports, read metadata and load image regions within a web browser.
+Openslide.js is a Javascript library wrapping Openslide via webassembly. With this library you can load images in any format that Openslide supports, read metadata and load image regions within a web browser.
 
 The project compiles [Openslide](https://openslide.org/), along with its dependencies, to web assembly using [Emscripten](https://emscripten.org/). There are also additional Javascript wrappers for common slide operations such as file loading and tile fetching.
 
