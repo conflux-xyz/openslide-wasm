@@ -17,7 +17,6 @@ async function run() {
   const canvas = document.getElementById("image");
   image.drawToCanvas(canvas, 0, 0, 0, 512, 512);
 }
-run();
 ```
 
 ## Limitations
@@ -32,11 +31,13 @@ To build the project follow these steps:
 
 2. Build the Docker build environment. We have included all the build tools necessary (e.g Emscripten, Meson) in this container: `docker build -t wasm-build .`
 
-3. Run the container `docker run -v .:/src wasm-build /bin/sh`
+3. Run the container `docker run -it -v .:/src wasm-build /bin/sh`
 
 4. Run the build script: `cd /src; ./build.sh`
 
 NOTE: The initial build can take 20-30 minutes to complete. Once the dependencies are compiled re-running the build script should be much faster.
+
+5. In the src directory: `yarn install; yarn tsc -b`
 
 ## Build locally
 
@@ -66,3 +67,5 @@ NOTE: The initial build can take 20-30 minutes to complete. Once the dependencie
    ```
    EMSCRIPTEN_PATH=<your emscripten install directory> SOURCE_HOME=$(pwd) ./build.sh
    ```
+
+5. In the src directory: `yarn install; yarn tsc -b`

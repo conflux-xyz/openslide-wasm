@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "none",
+    "strict": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "outDir": "../dist"
+  }
+}

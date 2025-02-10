@@ -193,7 +193,7 @@ fi
 # Build openslide wasm
 cd ${DEPS_DIRECTORY}
 (emcc -s FORCE_FILESYSTEM -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS="[ '_malloc', 'FS']" -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
-      ../src/api.c -o api.html) || { echo 'openslide-wasm build failed'; exit 1; }
+      ../src/openslide-api.c -o openslide-api.html) || { echo 'openslide-wasm build failed'; exit 1; }
 
-cp ${DEPS_DIRECTORY}/api.wasm /src/dist/api.wasm
-cp ${DEPS_DIRECTORY}/api.js /src/dist/api.js
+cp ${DEPS_DIRECTORY}/openslide-api.wasm /src/dist/openslide-api.wasm
+cp ${DEPS_DIRECTORY}/openslide-api.js /src/dist/openslide-api.js
