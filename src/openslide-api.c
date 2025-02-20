@@ -1,15 +1,22 @@
+#include <string.h>
 #include <stdio.h>
 #include <openslide/openslide.h>
 #include <emscripten/emscripten.h>
 
+
 EMSCRIPTEN_KEEPALIVE
-char* load_image(const char* path) {
-    openslide_t * img = openslide_open(path);
-    return (char*) img;
+void* load_image(void* url) {
+    void* ptr = openslide_open((const char*)url);
+    return ptr;
 }
 
 EMSCRIPTEN_KEEPALIVE
-char * close_image(char * ptr) {
+void write_byte_array(void* src, void * dest, uint32_t num_bytes) {
+    memcpy(dest, src, num_bytes);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void close_image(char * ptr) {
     openslide_close((openslide_t*) ptr);
 }
 
@@ -52,7 +59,21 @@ void free_result(char* ptr) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-char* read_region(char *ptr, int64_t x, int64_t y, int32_t level, int64_t w, int64_t h, bool read_rgba) {
+char* read_region(char *ptr, void* args) {
+    int32_t* arg_ptr = (int32_t*) args;
+    int64_t x = *((int64_t*) arg_ptr);
+    arg_ptr += 2;
+    int64_t y = *((int64_t*) arg_ptr);
+    arg_ptr += 2;
+    int32_t level = *arg_ptr;
+    // increment 2 bytes (1 for int32_t, 1 for alignment)
+    arg_ptr += 2;
+    int64_t w = *((int64_t*)arg_ptr);
+    arg_ptr += 2;
+    int64_t h = *((int64_t*)arg_ptr);
+    arg_ptr += 2;
+    int read_rgba = *arg_ptr;
+
     char *buffer = malloc(w * h * 4);
     openslide_read_region((openslide_t*)ptr, buffer, x, y, level, w, h);
     if (read_rgba) {

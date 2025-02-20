@@ -1,6 +1,6 @@
 declare type OpenslideWasmAPI = any;
 declare type OpenslidePtr = number;
-declare class OpenslideImage {
+export declare class OpenSlideImage {
     imgPtr: OpenslidePtr;
     wasmApi: OpenslideWasmAPI;
     filename: string;
@@ -14,13 +14,10 @@ declare class OpenslideImage {
     drawToCanvas(canvas: HTMLCanvasElement, x: number, y: number, level: number, w: number, h: number): void;
     close(): void;
 }
-declare function cstring(wasmApi: OpenslideWasmAPI, str: string): any;
-declare function fetchFileFromUrl(url: string): Promise<File>;
-declare function loadFile(wasmApi: OpenslideWasmAPI, file: File): Promise<unknown>;
-declare const Module: any;
-declare class Openslide {
+export declare class OpenSlide {
     private wasmApi;
     isReady: boolean;
     initialize(useWebworker?: boolean): Promise<unknown>;
-    open(fileOrUrl: File | string): Promise<OpenslideImage>;
+    open(fileOrUrl: File | string): Promise<OpenSlideImage>;
 }
+export {};
