@@ -1,5 +1,6 @@
 _build/
 external/
+external_native/
 .DS_Store
 external.tar.gz
 node_modules/

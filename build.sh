@@ -131,7 +131,7 @@ fi
 # Build Cairo
 if [ ! -f "$PKG_CONFIG_LIBDIR/libcairo.a" ]; then
 cd ${DEPS_DIRECTORY}/cairo
-(CFLAGS="$(pkg-config --cflags pixman freetype2, fontconfig, expat) -s USE_PTHREADS=1 -pthread" LDFLAGS="$(pkg-config --libs pixman libpng freetype2, fontconfig, expat) -lpthread  -s USE_PTHREADS=1 -pthread" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release -Dtests=disabled && \
+(CFLAGS="$(pkg-config --cflags pixman freetype2 fontconfig expat) -s USE_PTHREADS=1 -pthread" LDFLAGS="$(pkg-config --libs pixman libpng freetype2 fontconfig expat) -lpthread  -s USE_PTHREADS=1 -pthread" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release -Dtests=disabled && \
     meson install -C _build) || { echo 'cairo build failed'; exit 1; }
 else
 echo 'cairo found. Skipping build.';
@@ -183,16 +183,12 @@ echo 'libtiff found. Skipping build.';
 fi
 
 # Build openslide
-if [ ! -f "$PKG_CONFIG_LIBDIR/libopenslide.a" ]; then
 cd ${DEPS_DIRECTORY}/openslide
-(CFLAGS="-s USE_LIBJPEG=1 -s USE_ZLIB=1 $(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS" LDFLAGS="-s USE_LIBJPEG=1  $(pkgconfig --libs glib-2.0, cairo) -s USE_LIBJPEG=1 -lpthread" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
+(CFLAGS="-s USE_LIBJPEG=1 -sASSERTIONS -g -s USE_ZLIB=1 $(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS" LDFLAGS="-s USE_LIBJPEG=1  $(pkgconfig --libs glib-2.0, cairo) -s USE_LIBJPEG=1 -lpthread" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
     CFLAGS="$(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS -s USE_LIBJPEG=1 " LDFLAGS="$(pkgconfig --libs glib-2.0, cairo) -lpthread" meson install -C _build) || { echo 'openslide build failed'; exit 1; }
-else
-echo 'openslide found. Skipping build.';
-fi
 # Build openslide wasm
 cd ${DEPS_DIRECTORY}
-(emcc -s FORCE_FILESYSTEM -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS="[ '_malloc', 'FS']" -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
+(emcc -s FORCE_FILESYSTEM  -sASSERTIONS -g -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -sASYNCIFY -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS="[ '_malloc', 'FS', 'ccall', 'UTF8ToString']" -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
       ../src/openslide-api.c -o openslide-api.html) || { echo 'openslide-wasm build failed'; exit 1; }
 
 cp ${DEPS_DIRECTORY}/openslide-api.wasm /src/dist/openslide-api.wasm

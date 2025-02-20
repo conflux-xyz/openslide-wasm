@@ -1,10 +1,16 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "none",
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    "moduleResolution": "node",
+    "isolatedModules": true,
+
     "strict": true,
-    "declaration": true,
-    "esModuleInterop": true,
+    "noFallthroughCasesInSwitch": true,
     "outDir": "../dist"
   }
 }
