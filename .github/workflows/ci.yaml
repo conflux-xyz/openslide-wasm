@@ -25,13 +25,17 @@ jobs:
         run: aws s3 cp s3://conflux-public-data-staging/openslide/external.tar.gz external.tar.gz --quiet
       - name: Build wasm library
         run: |
-          rm -rf dist
-          mkdir dist
           tar -xzf external.tar.gz
           docker build -t wasm-build .
           docker run -v .:/src wasm-build ./build.sh
       - name: Check build success
         run: |
-          cd dist
-          if [ ! -f api.wasm ]; then exit -1; fi
-          if [ ! -f api.js ]; then exit -1; fi
+          cd src/dist
+          if [ ! -f openslide-api.wasm ]; then exit -1; fi
+          if [ ! -f openslide-api.js ]; then exit -1; fi
+      - name: Run tests
+        run: |
+          cd src
+          yarn install
+          yarn build
+          yarn test

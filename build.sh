@@ -184,12 +184,12 @@ fi
 
 # Build openslide
 cd ${DEPS_DIRECTORY}/openslide
-(CFLAGS="-s USE_LIBJPEG=1 -sASSERTIONS -g -s USE_ZLIB=1 $(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS" LDFLAGS="-s USE_LIBJPEG=1  $(pkgconfig --libs glib-2.0, cairo) -s USE_LIBJPEG=1 -lpthread" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
+(CFLAGS="-s USE_LIBJPEG=1 -g -s USE_ZLIB=1 $(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS" LDFLAGS="-s USE_LIBJPEG=1  $(pkgconfig --libs glib-2.0, cairo) -s USE_LIBJPEG=1 -lpthread" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
     CFLAGS="$(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS -s USE_LIBJPEG=1 " LDFLAGS="$(pkgconfig --libs glib-2.0, cairo) -lpthread" meson install -C _build) || { echo 'openslide build failed'; exit 1; }
 # Build openslide wasm
 cd ${DEPS_DIRECTORY}
 (emcc -s FORCE_FILESYSTEM  -sASSERTIONS -g -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -sASYNCIFY -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS="[ '_malloc', 'FS', 'ccall', 'UTF8ToString']" -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
       ../src/openslide-api.c -o openslide-api.html) || { echo 'openslide-wasm build failed'; exit 1; }
 
-cp ${DEPS_DIRECTORY}/openslide-api.wasm /src/dist/openslide-api.wasm
-cp ${DEPS_DIRECTORY}/openslide-api.js /src/dist/openslide-api.js
+cp ${DEPS_DIRECTORY}/openslide-api.wasm /src/src/dist/openslide-api.wasm
+cp ${DEPS_DIRECTORY}/openslide-api.js /src/src/dist/openslide-api.js

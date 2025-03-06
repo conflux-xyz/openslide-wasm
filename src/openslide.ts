@@ -1,11 +1,11 @@
-type OpenslideWasmAPI = any;
-type OpenslidePtr = number;
+type OpenSlideWasmAPI = any;
+type OpenSlidePtr = number;
 
 export class OpenSlideImage {
-  imgPtr: OpenslidePtr;
-  wasmApi: OpenslideWasmAPI;
+  imgPtr: OpenSlidePtr;
+  wasmApi: OpenSlideWasmAPI;
 
-  constructor(wasmApi: OpenslideWasmAPI, imgPtr: OpenslidePtr) {
+  constructor(wasmApi: OpenSlideWasmAPI, imgPtr: OpenSlidePtr) {
     this.imgPtr = imgPtr;
     this.wasmApi = wasmApi;
   }
@@ -67,14 +67,14 @@ export class OpenSlideImage {
   ) {
     // We malloc memory to pack all values into a single chunk of memory
     const args = Module._malloc(40);
-    Module.HEAP64[(args / 8)] = 48804n;   // int64_t x (8 bytes)
-    Module.HEAP64[(args / 8) + 1] = 34941n; // int64_t y (8 bytes)
-    Module.HEAP32[(args / 4) + 4] = 0;    // int32_t level (4 bytes)
-    Module.HEAP32[(args / 4) + 5] = 0;    // Padding (4 bytes, required for alignment)
-    Module.HEAP64[(args / 8) + 3] = 512n; // int64_t w (8 bytes)
-    Module.HEAP64[(args / 8) + 4] = 512n; // int64_t h (8 bytes)
-    Module.HEAP32[(args / 4) + 10] = 1;   // int32_t read_rgba (4 bytes)
-    
+    Module.HEAP64[args / 8] = 48804n; // int64_t x (8 bytes)
+    Module.HEAP64[args / 8 + 1] = 34941n; // int64_t y (8 bytes)
+    Module.HEAP32[args / 4 + 4] = 0; // int32_t level (4 bytes)
+    Module.HEAP32[args / 4 + 5] = 0; // Padding (4 bytes, required for alignment)
+    Module.HEAP64[args / 8 + 3] = 512n; // int64_t w (8 bytes)
+    Module.HEAP64[args / 8 + 4] = 512n; // int64_t h (8 bytes)
+    Module.HEAP32[args / 4 + 10] = 1; // int32_t read_rgba (4 bytes)
+
     const data = await this.wasmApi.ccall(
       "read_region",
       "number",
@@ -110,14 +110,14 @@ export class OpenSlideImage {
     if (!canvasCtx) throw "Error geting canvas context";
 
     const args = Module._malloc(40);
-    Module.HEAP64[(args / 8)] = BigInt(x);   // int64_t x (8 bytes)
-    Module.HEAP64[(args / 8) + 1] = BigInt(y); // int64_t y (8 bytes)
-    Module.HEAP32[(args / 4) + 4] = level;    // int32_t level (4 bytes)
-    Module.HEAP32[(args / 4) + 5] = 0;    // Padding (4 bytes, required for alignment)
-    Module.HEAP64[(args / 8) + 3] = BigInt(w); // int64_t w (8 bytes)
-    Module.HEAP64[(args / 8) + 4] = BigInt(h); // int64_t h (8 bytes)
-    Module.HEAP32[(args / 4) + 10] = 0;   // int32_t read_rgba (4 bytes)
-    
+    Module.HEAP64[args / 8] = BigInt(x); // int64_t x (8 bytes)
+    Module.HEAP64[args / 8 + 1] = BigInt(y); // int64_t y (8 bytes)
+    Module.HEAP32[args / 4 + 4] = level; // int32_t level (4 bytes)
+    Module.HEAP32[args / 4 + 5] = 0; // Padding (4 bytes, required for alignment)
+    Module.HEAP64[args / 8 + 3] = BigInt(w); // int64_t w (8 bytes)
+    Module.HEAP64[args / 8 + 4] = BigInt(h); // int64_t h (8 bytes)
+    Module.HEAP32[args / 4 + 10] = 0; // int32_t read_rgba (4 bytes)
+
     const data = await this.wasmApi.ccall(
       "read_region",
       "number",
@@ -144,34 +144,81 @@ export class OpenSlideImage {
   }
   close() {
     this.wasmApi.close_image(this.imgPtr);
-    this.wasmApi.FS
+    this.wasmApi.FS;
   }
 }
 
 // Utility functions
-function cstring(wasmApi: OpenslideWasmAPI, str: string) {
+async function fetchFileFromUrl(url: string) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const file = new File([blob], url, { type: blob.type });
+  return file;
+}
+
+function loadFile(wasmApi: OpenSlideWasmAPI, file: File): Promise<string> {
+  return new Promise((resolve, _) => {
+    const chunkSize = 64 * 1024 * 1024;
+    function writeToWasm(
+      file: File,
+      offset: number,
+      chunkSize: number,
+      filename: string
+    ) {
+      const reader = new FileReader();
+      const chunk = file.slice(offset, offset + chunkSize);
+      reader.onload = function (event: ProgressEvent<FileReader>) {
+        if (!event.target) throw "Could not read file";
+        const arrayBuffer = event.target.result as ArrayBuffer;
+        const uint8Array = new Uint8Array(arrayBuffer);
+        if (offset === 0) {
+          wasmApi.FS.createDataFile("/", filename, uint8Array, true, true);
+        } else {
+          const stream = wasmApi.FS.open("/" + filename, "a+");
+          wasmApi.FS.write(stream, uint8Array, 0, uint8Array.length);
+          wasmApi.FS.close(stream);
+        }
+        offset += chunkSize;
+        if (offset < file.size) {
+          writeToWasm(file, offset, chunkSize, filename);
+        } else {
+          resolve(filename);
+        }
+      };
+      reader.onerror = function (error) {
+        console.error("Error reading file chunk:", error);
+      };
+
+      reader.readAsArrayBuffer(chunk);
+    }
+    let randomName = "__local_file__";
+    for (let i = 0; i < 10; i++) {
+      randomName += String.fromCharCode(Math.floor(Math.random() * 26) + 97);
+    }
+    randomName += ".tmp";
+    writeToWasm(file, 0, chunkSize, randomName);
+  });
+}
+
+function cstring(wasmApi: OpenSlideWasmAPI, str: string) {
   const str_raw = new TextEncoder().encode(str);
   let ptr = wasmApi._malloc(str_raw.length + 1);
   let chunk = wasmApi.HEAPU8.subarray(ptr, ptr + str_raw.length);
   chunk.set(str_raw);
-  let terminator = wasmApi.HEAPU8.subarray(
-    ptr + str_raw.length,
-    ptr + str_raw.length + 1
-  );
-  terminator.set(0);
+  wasmApi.HEAPU8[ptr + str_raw.length] = 0;
   return ptr;
 }
 
 declare const Module: any;
 
 export class OpenSlide {
-  private wasmApi: OpenslideWasmAPI;
+  private wasmApi: OpenSlideWasmAPI;
   public isReady: boolean = false;
 
-  async initialize(useWebworker: boolean = false) {
+  async initialize(path: string = "", skipScriptLoad: boolean = false) {
     return new Promise<unknown>(async (resolve) => {
-      if (!useWebworker) {
-        const scripts = ["openslide-api.js"];
+      if (!skipScriptLoad) {
+        const scripts = [path + "openslide-api.js"];
         const promises = scripts.map((file) => {
           const s = document.createElement("script");
           s.setAttribute("src", file);
@@ -185,6 +232,7 @@ export class OpenSlide {
         });
         await Promise.all(promises);
       }
+
       Module.onRuntimeInitialized = () => {
         this.wasmApi = Module;
         this.isReady = true;
@@ -193,11 +241,30 @@ export class OpenSlide {
     });
   }
 
-  async open(fileOrUrl: File | string) {
-    const path = cstring(this.wasmApi, fileOrUrl as string);
-    const img = await this.wasmApi.ccall("load_image", "number", ["number"], [path], {
-      async: true,
-    });
+  async open(fileOrUrl: File | string, downloadToLocal: boolean = false) {
+    let path: number = 0;
+    if (typeof fileOrUrl === "string") {
+      if (downloadToLocal) {
+        const file = await fetchFileFromUrl(fileOrUrl);
+        const wasmFilePath = await loadFile(this.wasmApi, file);
+        path = cstring(this.wasmApi, wasmFilePath);
+      } else {
+        path = cstring(this.wasmApi, fileOrUrl as string);
+      }
+    } else {
+      // copy the file onto the wasm file system
+      const wasmFilePath = await loadFile(this.wasmApi, fileOrUrl);
+      path = cstring(this.wasmApi, wasmFilePath as string);
+    }
+    const img = await this.wasmApi.ccall(
+      "load_image",
+      "number",
+      ["number"],
+      [path],
+      {
+        async: true,
+      }
+    );
     this.wasmApi._free_result(path);
     return new OpenSlideImage(this.wasmApi, img);
   }

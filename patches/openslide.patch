@@ -30,7 +30,7 @@ index fb254c8..1c3c976 100644
    case TIFF_ASCII: {
      // will only print first string if there are multiple
 diff --git a/src/openslide-file.c b/src/openslide-file.c
-index 20f53a8..3f0dcd2 100644
+index 20f53a8..e40979c 100644
 --- a/src/openslide-file.c
 +++ b/src/openslide-file.c
 @@ -23,11 +23,12 @@
@@ -55,7 +55,7 @@ index 20f53a8..3f0dcd2 100644
  };
  
  struct _openslide_dir {
-@@ -62,86 +64,198 @@ static void io_error(GError **err, const char *fmt, ...) {
+@@ -62,86 +64,227 @@ static void io_error(GError **err, const char *fmt, ...) {
    va_end(ap);
  }
  
@@ -83,8 +83,6 @@ index 20f53a8..3f0dcd2 100644
 -  f = fopen(path, mode);  // ci-allow
 -  if (f == NULL) {
 -    io_error(err, "Couldn't open %s", path);
--  }
--#endif
 +/** Remote read emscripten callbacks **/
 +EM_ASYNC_JS(int, remote_open, (void* path, int* error), {
 +    const BLOCK_SIZE = 150000;
@@ -118,22 +116,52 @@ index 20f53a8..3f0dcd2 100644
 +    return handle;
 +});
 +
-+bool has_http_prefix(const char *str) {
-+    return strncmp(str, "http", 4) == 0;
++bool has_local_prefix(const char *str) {
++    return strncmp(str, "__local_file__", 14) != 0;
 +}
++
++int do_fopen(const char *path, const char *mode, GError **err) {
++  if (has_local_prefix(path)) {
++    int* status = malloc(sizeof(int));
++    int result = remote_open(path, status);
++    
++    if (result <= 0 || *status < 0) {
++      io_error(err, "Couldn't open %s %s", path, mode);
++      free(status);
++      return 0;
++    }
++    free(status);
++    return result;
++  } else {
++    FILE *f;
++    #ifdef _WIN32
++      g_autofree wchar_t *path16 =
++        (wchar_t *) g_utf8_to_utf16(path, -1, NULL, NULL, err);
++      if (path16 == NULL) {
++        g_prefix_error(err, "Couldn't open %s: ", path);
++        return NULL;
++      }
++      g_autofree wchar_t *mode16 =
++        (wchar_t *) g_utf8_to_utf16(mode, -1, NULL, NULL, err);
++      if (mode16 == NULL) {
++        g_prefix_error(err, "Bad file mode %s: ", mode);
++        return NULL;
++      }
++      f = _wfopen(path16, mode16);
++      if (f == NULL) {
++        io_error(err, "Couldn't open %s", path);
++      }
++    #else
++      f = fopen(path, mode);  // ci-allow
++      if (f == NULL) {
++        io_error(err, "Couldn't open %s", path);
++      }
++    #endif
++    return (int) f;
+   }
+-#endif
  
 -  return f;
-+int do_fopen(const char *path, const char *mode, GError **err) {
-+  int* status = malloc(sizeof(int));
-+  int result = remote_open(path, status);
-+  
-+  if (result <= 0 || *status < 0) {
-+    io_error(err, "Couldn't open %s %s", path, mode);
-+    free(status);
-+    return 0;
-+  }
-+  free(status);
-+  return result;
  }
  
  struct _openslide_file *_openslide_fopen(const char *path, GError **err)
@@ -147,7 +175,7 @@ index 20f53a8..3f0dcd2 100644
 +  struct _openslide_file *file = calloc(1, sizeof(struct _openslide_file));
 +  file->fp = (FILE*)f;
 +  file->path = strdup(new_path);
-+  file->isRemote = true;
++  file->isRemote = has_local_prefix(path);
 +  free(new_path);
 +  return file;
  
@@ -317,7 +345,7 @@ index 20f53a8..3f0dcd2 100644
  }
  
  bool _openslide_fread_exact(struct _openslide_file *file,
-@@ -160,23 +274,95 @@ bool _openslide_fread_exact(struct _openslide_file *file,
+@@ -160,23 +303,95 @@ bool _openslide_fread_exact(struct _openslide_file *file,
    return true;
  }
  
@@ -421,7 +449,7 @@ index 20f53a8..3f0dcd2 100644
  off_t _openslide_fsize(struct _openslide_file *file, GError **err) {
    off_t orig = _openslide_ftell(file, err);
    if (orig == -1) {
-@@ -199,14 +385,40 @@ off_t _openslide_fsize(struct _openslide_file *file, GError **err) {
+@@ -199,14 +414,40 @@ off_t _openslide_fsize(struct _openslide_file *file, GError **err) {
    return ret;
  }
  
@@ -456,7 +484,7 @@ index 20f53a8..3f0dcd2 100644
  
  bool _openslide_fexists(const char *path, GError **err G_GNUC_UNUSED) {
 -  return g_file_test(path, G_FILE_TEST_EXISTS);  // ci-allow
-+  if (has_http_prefix(path)) {
++  if (has_local_prefix(path)) {
 +    int e;
 +    remote_open(path, &e);
 +    return e > 0;
