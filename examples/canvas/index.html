@@ -1,0 +1,123 @@
+<html>
+  <head>
+    <title>Openslide Test</title>
+    <script language="javascript" type="module">
+      import OpenSlide from "/openslide-wasm/dist/openslide.js";
+
+      async function initialize() {
+        window.openslide = new OpenSlide();
+        console.log('created');
+        await openslide.initialize();
+        console.log('initialized');
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        initialize();
+      });
+
+      const downloadRemoteCheckbox = document.getElementById("downloadRemote");
+      const mppInput = document.getElementById("mpp");
+      const fileInput = document.getElementById("file");
+      const remoteUrlInput = document.getElementById("remoteUrl");
+      const loadRemoteButton = document.getElementById("loadRemote");
+      const canvas = document.getElementById("image");
+      const ctx2d = canvas.getContext("2d");
+      const clearButton = document.getElementById("clear");
+
+      const handleSlide = async (slide) => {
+        clearButton.onclick = async () => {
+          console.log('closing...');
+          await slide.close();
+          fileInput.value = null;
+          ctx2d.reset();
+          console.log('closed');
+        };
+        console.log('opened');
+        const slideMppStr = await slide.getPropertyValue("openslide.mpp-x");
+        if (!slideMppStr) {
+          console.error("No MPP property found");
+          return;
+        }
+        const slideMpp = parseFloat(slideMppStr);
+        console.log("Slide MPP", slideMpp);
+        const mpp = parseFloat(mppInput.value);
+        const downsample = mpp / slideMpp;
+        const [width, height] = await slide.getLevelDimensions(0);
+        const targetWidth = Math.round(width / downsample);
+        const targetHeight = Math.round(height / downsample);
+        console.log("Downsample", downsample);
+        console.log("Target dims", targetWidth, targetHeight);
+        const bestLevel = await slide.getBestLevelForDownsample(downsample);
+        console.log("Best level for downsample", bestLevel);
+        const [levelWidth, levelHeight] = await slide.getLevelDimensions(bestLevel);
+        console.log('level dims', levelWidth, levelHeight);
+        const region = await slide.readRegion(0, 0, bestLevel, levelWidth, levelHeight, true);
+        console.log('got region');
+        const imageData = new ImageData(region.slice(), levelWidth, levelHeight);
+
+        // Resize the image data to the desired width and height
+        const bitmap = await createImageBitmap(imageData, {
+          resizeWidth: targetWidth,
+          resizeHeight: targetHeight,
+        });
+
+        // const tempCanvas = document.createElement("canvas");
+        // tempCanvas.width = levelWidth;
+        // tempCanvas.height = levelHeight;
+        // const tempCtx = tempCanvas.getContext("2d");
+        // if (!tempCtx) {
+        //   throw new Error("Failed to get 2D context");
+        // }
+        // tempCtx.putImageData(imageData, 0, 0);
+
+        if (!ctx2d) {
+          throw new Error("Failed to get 2D context");
+        }
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        // ctx2d.putImageData(imageData, 0, 0);
+        ctx2d.drawImage(bitmap, 0, 0);
+        // ctx2d.drawImage(tempCanvas, 0, 0, levelWidth, levelHeight, 0, 0, targetWidth, targetHeight);
+      }
+
+      // On file input change, load the file and display it
+      fileInput.addEventListener("change", async (e) => {
+        clearButton.onclick = null;
+        const file = e.target.files[0];
+        if (!file) return;
+        console.log('file', file);
+        const slide = await window.openslide.open(file);
+        await handleSlide(slide);
+      });
+
+      loadRemoteButton.onclick = async () => {
+        clearButton.onclick = null;
+        const url = remoteUrlInput.value;
+        if (!url) return;
+        console.log('url', url);
+        const downloadRemote = downloadRemoteCheckbox.checked;
+        const slide = await window.openslide.open(url, downloadRemote);
+        await handleSlide(slide);
+      };
+    </script>
+  </head>
+  <body>
+    <div>
+      <input type="file" id="file" name="SLIDE" />
+    </div>
+    <div>
+      <input type="text" id="remoteUrl" placeholder="Remote URL" value="https://d3bzvr1k8ur14a.cloudfront.net/openslide-wasm/TCGA-LL-A7SZ-01Z-00-DX1.4DAF6421-6A1D-41C8-BFD6-859FE10CB8CC.svs" />
+      <button id="loadRemote">Load Remote</button>
+      <input type="checkbox" id="downloadRemote" />
+      <label for="downloadRemote">Download Remote</label>
+    </div>
+    <div>
+      <label for="mpp">MPP</label>
+      <input type="number" id="mpp" placeholder="MPP" value="40.0" step="0.01"/>
+    </div>
+    <div>
+      <button id="clear">Clear</button>
+    </div>
+    <canvas id="image" width="1px" height="1px" style="border: 5px solid black;"></canvas>
+  </body>
+</html>

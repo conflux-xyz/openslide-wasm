@@ -4,3 +4,4 @@ external_native/
 .DS_Store
 external.tar.gz
 node_modules/
+openslide-wasm/dist/

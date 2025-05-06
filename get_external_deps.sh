@@ -9,7 +9,7 @@ git clone  --depth 1 --branch v1.2.13 https://github.com/madler/zlib.git
 
 # libjpeg-turbo
 cd ${SOURCE_HOME}
-git clone git@github.com:libjpeg-turbo/libjpeg-turbo.git
+git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git
 cd libjpeg-turbo
 git checkout e0e18de
 
@@ -28,7 +28,8 @@ git checkout ac598b7
 
 # glib
 cd ${SOURCE_HOME}
-git clone --depth 1 --branch wasm-calm-2.76.1 https://github.com/VitoVan/glib.git
+# Use `--recurse-submodules` to clone submodules, specifically `subprojects/gvdb`
+git clone --depth 1 --branch wasm-calm-2.76.1 --recurse-submodules https://github.com/VitoVan/glib.git
 cd glib
 git apply ${SOURCE_HOME}/../patches/glib.patch
 
@@ -78,7 +79,7 @@ git checkout 86401cc3d293d6ea3c4552885e3cadcd952021d1
 
 # gdk-pixbuf
 cd ${SOURCE_HOME}
-git clone git@github.com:GNOME/gdk-pixbuf.git
+git clone https://github.com/GNOME/gdk-pixbuf.git
 cd gdk-pixbuf
 git checkout e4315fb
 git apply ${SOURCE_HOME}/../patches/gdk-pixbuf.patch
@@ -93,11 +94,11 @@ git checkout 9337327
 cd ${SOURCE_HOME}
 wget https://download.osgeo.org/libtiff/tiff-4.7.0.tar.xz
 tar -xf tiff-4.7.0.tar.xz
-mv tiff-4.7.0 libtiff
-cd libtiff
+rm tiff-4.7.0.tar.xz
 wget https://wrapdb.mesonbuild.com/v2/libtiff_4.7.0-1/get_patch -O patch.zip
 unzip patch.zip
-cp -r tiff-4.7.0/ .
+rm patch.zip
+mv tiff-4.7.0 libtiff
 
 # openslide
 cd ${SOURCE_HOME}

@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 if [ -z "$EMSCRIPTEN_PATH" ]; then
   export EMSCRIPTEN_PATH=/emsdk/emsdk_env.sh
 fi
@@ -183,12 +185,15 @@ echo 'libtiff found. Skipping build.';
 fi
 
 # Build openslide
+if [ ! -f "$PKG_CONFIG_LIBDIR/libopenslide.a" ]; then
 cd ${DEPS_DIRECTORY}/openslide
 (CFLAGS="-s USE_LIBJPEG=1 -g -s USE_ZLIB=1 $(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS" LDFLAGS="-s USE_LIBJPEG=1  $(pkgconfig --libs glib-2.0, cairo) -s USE_LIBJPEG=1 -lpthread" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
     CFLAGS="$(pkgconfig --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0, cairo) -s USE_PTHREADS -s USE_LIBJPEG=1 " LDFLAGS="$(pkgconfig --libs glib-2.0, cairo) -lpthread" meson install -C _build) || { echo 'openslide build failed'; exit 1; }
+else
+echo 'openslide found. Skipping build.';
+fi
+
 # Build openslide wasm
 cd ${DEPS_DIRECTORY}
-(emcc -s FORCE_FILESYSTEM -s WASM=1 -s SINGLE_FILE=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s ENVIRONMENT=web,worker -g -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -sASYNCIFY -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS="[ '_malloc', 'FS', 'ccall', 'UTF8ToString']" -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
-      ../src/openslide-api.c -o openslide-api.js) || { echo 'openslide-wasm build failed'; exit 1; }
-
-cp ${DEPS_DIRECTORY}/openslide-api.js /src/src/dist/openslide-api.js
+(emcc -s FORCE_FILESYSTEM -lworkerfs.js -s WASM=1 -s SINGLE_FILE=1 -s MODULARIZE=1 -s EXPORT_NAME="createModule" -s EXPORT_ES6=1 -s ENVIRONMENT=web,worker -g -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -sASYNCIFY -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS="[ '_malloc', '_free', 'FS', 'ccall', 'cwrap', 'UTF8ToString']" -s EXPORTED_RUNTIME_METHODS=FS,WORKERFS,HEAP8,HEAPU8,HEAP32,HEAPU32,HEAP64 -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
+      ../openslide-wasm/openslide-api.c -o ../openslide-wasm/src/lib.js) || { echo 'openslide-wasm build failed'; exit 1; }

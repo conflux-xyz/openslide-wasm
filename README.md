@@ -16,8 +16,8 @@ To use the library you just need to add `openslide.js` directory to your web pro
    const ctx = new OpenSlide();
    await ctx.initialize();
    const image = await ctx.open("sample.svs");
-   const numLevels = image.getLevelCount();
-   const dims = image.getLevelDimensions(0);
+   const numLevels = await image.getLevelCount();
+   const dims = await image.getLevelDimensions(0);
    const canvas = document.getElementById("image");
    image.drawToCanvas(canvas, 0, 0, 0, 512, 512);
   }
@@ -31,7 +31,7 @@ You can also install via [Yarn](https://classic.yarnpkg.com/en/) or [NPM](https:
 - `yarn add @conflux-xyz/openslide-wasm`
 - `npm install @conflux-xyz/openslide-wasm`
 
-See more details on using NPM or Yarn [here](https://github.com/conflux-xyz/openslide-wasm/blob/main/src/README.md).
+See more details on using NPM or Yarn [here](https://github.com/conflux-xyz/openslide-wasm/blob/main/openslide-wasm/README.md).
 
 ## Limitations
 
@@ -46,13 +46,11 @@ To build the project follow these steps:
 
 2. Build the Docker build environment. We have included all the build tools necessary (e.g Emscripten, Meson) in this container: `docker build -t wasm-build .`
 
-3. Run the container `docker run -it -v .:/src wasm-build /bin/sh`
-
-4. Run the build script: `cd /src; ./build.sh`
+3. Build in the docker container: `docker run -v .:/src wasm-build ./build.sh`
 
 NOTE: The initial build can take 20-30 minutes to complete. Once the dependencies are compiled re-running the build script should be much faster.
 
-5. In the src directory: `yarn install; yarn build`
+4. In the `openslide-wasm` directory: `yarn install; yarn build`
 
 ## Build locally
 
@@ -83,7 +81,7 @@ NOTE: The initial build can take 20-30 minutes to complete. Once the dependencie
    EMSCRIPTEN_PATH=<your emscripten install directory> SOURCE_HOME=$(pwd) ./build.sh
    ```
 
-5. In the src directory: `yarn install; yarn build`
+5. In the `openslide-wasm` directory: `yarn install; yarn build`
 
 ## Tests
-A basic set of unit tests is included in the src/tests directory. They can be run via `yarn test`
+A basic set of unit tests is included in the `openslide-wasm/tests/` directory. They can be run via `yarn test`

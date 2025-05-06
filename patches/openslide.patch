@@ -117,14 +117,14 @@ index 20f53a8..e40979c 100644
 +});
 +
 +bool has_local_prefix(const char *str) {
-+    return strncmp(str, "__local_file__", 14) != 0;
++    return strncmp(str, "/tmp-local-", 11) != 0;
 +}
 +
 +int do_fopen(const char *path, const char *mode, GError **err) {
 +  if (has_local_prefix(path)) {
 +    int* status = malloc(sizeof(int));
 +    int result = remote_open(path, status);
-+    
++
 +    if (result <= 0 || *status < 0) {
 +      io_error(err, "Couldn't open %s %s", path, mode);
 +      free(status);
@@ -230,7 +230,7 @@ index 20f53a8..e40979c 100644
 +        return;
 +      }
 +      const rawBuffer = await response.arrayBuffer();
-+      const rawText = new TextDecoder().decode(rawBuffer); 
++      const rawText = new TextDecoder().decode(rawBuffer);
 +      const contentType = response.headers.get("Content-Type");
 +      const boundaryMatch = contentType.match(/boundary=(.+)/);
 +      if (!boundaryMatch) {
@@ -310,7 +310,7 @@ index 20f53a8..e40979c 100644
 -    size_t count = fread(bufp + total, 1, size - total, file->fp);  // ci-allow
 -    if (count == 0) {
 -      break;
-+  
++
 +  if (file->isRemote) {
 +    int* e = malloc(sizeof(int));
 +    size_t total = remote_read((int)file->fp, false, buf, size, e);
@@ -489,7 +489,7 @@ index 20f53a8..e40979c 100644
 +    remote_open(path, &e);
 +    return e > 0;
 +  } else {
-+    return g_file_test(path, G_FILE_TEST_EXISTS); 
++    return g_file_test(path, G_FILE_TEST_EXISTS);
 +  }
  }
  
