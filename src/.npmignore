@@ -1,7 +1,0 @@
-jest.config.mjs
-*.c
-tests/
-*.svs
-*.html
-openslide.ts
-tsconfig.json
