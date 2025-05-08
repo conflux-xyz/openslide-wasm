@@ -107,13 +107,10 @@ describe("Test OpenSlide (HTTP file system)", () => {
   }, 30000);
 
   it("should load the property names and values", async () => {
-    const {
-      names,
-      value,
-    } = await page.evaluate(async () => {
+    const { names, value } = await page.evaluate(async () => {
       const names = await window.slide_remote_fs.getPropertyNames();
       const value = await window.slide_remote_fs.getPropertyValue(names[0]);
-      return {names, value};
+      return { names, value };
     });
     expect(names[0]).toBe("aperio.AppMag");
     expect(names.length).toBe(57);
@@ -121,21 +118,20 @@ describe("Test OpenSlide (HTTP file system)", () => {
   });
 
   it("should respond with the right downsample level information", async () => {
-    const {
-      levelCount,
-      levelDownsample,
-      bestDownsample,
-    } = await page.evaluate(async () => {
-      const levelCount = await window.slide_remote_fs.getLevelCount();
-      const levelDownsample = await window.slide_remote_fs.getLevelDownsample(1);
-      const bestDownsample = await window.slide_remote_fs.getBestLevelForDownsample(20);
-      return {levelCount, levelDownsample, bestDownsample};
-    });
+    const { levelCount, levelDownsample, bestDownsample } = await page.evaluate(
+      async () => {
+        const levelCount = await window.slide_remote_fs.getLevelCount();
+        const levelDownsample =
+          await window.slide_remote_fs.getLevelDownsample(1);
+        const bestDownsample =
+          await window.slide_remote_fs.getBestLevelForDownsample(20);
+        return { levelCount, levelDownsample, bestDownsample };
+      },
+    );
     expect(levelCount).toBe(4);
     expect(levelDownsample).toBeCloseTo(4.0, 3);
     expect(bestDownsample).toBe(2);
   });
-
 
   it("should have the right dimensions", async () => {
     const [level0] = await page.evaluate(async () => {

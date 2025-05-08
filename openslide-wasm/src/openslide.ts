@@ -3,7 +3,7 @@ import { WorkerCommandBase, WorkerResponse, OpenSlideT } from "./types";
 type PromiseFns = {
   resolve: (value: WorkerResponse) => void;
   reject: (reason: Error) => void;
-}
+};
 
 function randomString(length: number = 10) {
   let randomName = "";
@@ -18,7 +18,10 @@ class OpenSlideWorker {
   _promiseFns: Map<string, PromiseFns>;
 
   constructor() {
-    this._worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+    this._worker = new Worker(
+      new URL("./worker.js", import.meta.url),
+      { type: "module" } /* @vite-ignore */,
+    );
     this._worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const { data } = event;
       const id = data.id;
@@ -43,7 +46,6 @@ class OpenSlideWorker {
       this._promiseFns.set(id, { resolve, reject });
     });
   }
-
 }
 
 export default class OpenSlide {
@@ -61,8 +63,14 @@ export default class OpenSlide {
     return;
   }
 
-  async open(file: File | string, downloadToLocal: boolean = false): Promise<OpenSlideImage> {
-    const response = await this.worker.sendCommand({ type: "open", payload: { file, downloadToLocal } });
+  async open(
+    file: File | string,
+    downloadToLocal: boolean = false,
+  ): Promise<OpenSlideImage> {
+    const response = await this.worker.sendCommand({
+      type: "open",
+      payload: { file, downloadToLocal },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -73,16 +81,21 @@ export default class OpenSlide {
   }
 }
 
-class OpenSlideImage {
-  constructor(private osr: OpenSlideT, private worker: OpenSlideWorker) {
-  }
+export class OpenSlideImage {
+  constructor(
+    private osr: OpenSlideT,
+    private worker: OpenSlideWorker,
+  ) {}
 
   /**
    * Close the OpenSlide image.
    * @returns A promise that resolves when the image is closed.
    */
   async close() {
-    const response = await this.worker.sendCommand({ type: "close", payload: { osr: this.osr } });
+    const response = await this.worker.sendCommand({
+      type: "close",
+      payload: { osr: this.osr },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -96,7 +109,10 @@ class OpenSlideImage {
    * @returns An array of property names.
    */
   async getPropertyNames(): Promise<string[]> {
-    const response = await this.worker.sendCommand({ type: "getPropertyNames", payload: { osr: this.osr } });
+    const response = await this.worker.sendCommand({
+      type: "getPropertyNames",
+      payload: { osr: this.osr },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -112,7 +128,10 @@ class OpenSlideImage {
    * @returns The value of the property, or null if not found.
    */
   async getPropertyValue(name: string): Promise<string | null> {
-    const response = await this.worker.sendCommand({ type: "getPropertyValue", payload: { osr: this.osr, name } });
+    const response = await this.worker.sendCommand({
+      type: "getPropertyValue",
+      payload: { osr: this.osr, name },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -127,7 +146,10 @@ class OpenSlideImage {
    * @returns The number of levels in the image.
    */
   async getLevelCount(): Promise<number> {
-    const response = await this.worker.sendCommand({ type: "getLevelCount", payload: { osr: this.osr } });
+    const response = await this.worker.sendCommand({
+      type: "getLevelCount",
+      payload: { osr: this.osr },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -143,7 +165,10 @@ class OpenSlideImage {
    * @returns The dimensions of the specified level as a tuple [width, height].
    */
   async getLevelDimensions(level: number): Promise<[number, number]> {
-    const response = await this.worker.sendCommand({ type: "getLevelDimensions", payload: { osr: this.osr, level } });
+    const response = await this.worker.sendCommand({
+      type: "getLevelDimensions",
+      payload: { osr: this.osr, level },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -159,7 +184,10 @@ class OpenSlideImage {
    * @returns The downsample factor for the specified level.
    */
   async getLevelDownsample(level: number): Promise<number> {
-    const response = await this.worker.sendCommand({ type: "getLevelDownsample", payload: { osr: this.osr, level } });
+    const response = await this.worker.sendCommand({
+      type: "getLevelDownsample",
+      payload: { osr: this.osr, level },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -175,7 +203,10 @@ class OpenSlideImage {
    * @returns The best level for the specified downsample factor.
    */
   async getBestLevelForDownsample(downsample: number): Promise<number> {
-    const response = await this.worker.sendCommand({ type: "getBestLevelForDownsample", payload: { osr: this.osr, downsample } });
+    const response = await this.worker.sendCommand({
+      type: "getBestLevelForDownsample",
+      payload: { osr: this.osr, downsample },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -195,8 +226,18 @@ class OpenSlideImage {
    * @param readRgba - Whether to read the region as RGBA (default: false).
    * @returns A promise that resolves to a Uint8ClampedArray containing the pixel data.
    */
-  async readRegion(x: number, y: number, level: number, width: number, height: number, readRgba: boolean = false): Promise<Uint8ClampedArray> {
-    const response = await this.worker.sendCommand({ type: "readRegion", payload: { osr: this.osr, x, y, level, width, height, readRgba } });
+  async readRegion(
+    x: number,
+    y: number,
+    level: number,
+    width: number,
+    height: number,
+    readRgba: boolean = false,
+  ): Promise<Uint8ClampedArray> {
+    const response = await this.worker.sendCommand({
+      type: "readRegion",
+      payload: { osr: this.osr, x, y, level, width, height, readRgba },
+    });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
