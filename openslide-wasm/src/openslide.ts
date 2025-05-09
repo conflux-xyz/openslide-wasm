@@ -61,8 +61,10 @@ export default class OpenSlide {
     return;
   }
 
-  async open(file: File | string, downloadToLocal: boolean = false): Promise<OpenSlideImage> {
-    const response = await this.worker.sendCommand({ type: "open", payload: { file, downloadToLocal } });
+  async open(file: File | URL | string, downloadToLocal: boolean = false): Promise<OpenSlideImage> {
+    const fileOrUrl = ensureFileOrUrl(file);
+    const fileOrString = fileOrUrl instanceof URL ? fileOrUrl.toString() : fileOrUrl;
+    const response = await this.worker.sendCommand({ type: "open", payload: { file: fileOrString, downloadToLocal } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -70,6 +72,27 @@ export default class OpenSlide {
       throw new Error("Unexpected response type");
     }
     return new OpenSlideImage(response.payload.osr, this.worker);
+  }
+}
+
+function ensureFileOrUrl(file: File | URL | string): File | URL {
+  if (file instanceof File || file instanceof URL) {
+    return file;
+  }
+  if (file.startsWith("http://") || file.startsWith("https://")) {
+    try {
+      return new URL(file);
+    } catch (e) {
+      throw new Error("Invalid URL");
+    }
+  }
+  // If the file does not start with http:// or https://, assume it is a relative URL
+  // and try to create a URL object from it.
+  // This will throw an error if the URL is invalid.
+  try {
+    return new URL(file, window.location.href);
+  } catch (e) {
+    throw new Error("Invalid URL");
   }
 }
 
