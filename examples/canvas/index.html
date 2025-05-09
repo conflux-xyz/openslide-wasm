@@ -20,16 +20,22 @@
       const fileInput = document.getElementById("file");
       const remoteUrlInput = document.getElementById("remoteUrl");
       const loadRemoteButton = document.getElementById("loadRemote");
-      const canvas = document.getElementById("image");
-      const ctx2d = canvas.getContext("2d");
       const clearButton = document.getElementById("clear");
+      const canvases = [0, 1, 2, 3].map((i) => document.getElementById(`image${i}`));
+      const ctx2ds = canvases.map((canvas) => {
+        const ctx2d = canvas.getContext("2d");
+        if (!ctx2d) {
+          throw new Error("Failed to get 2D context");
+        }
+        return ctx2d;
+      });
 
       const handleSlide = async (slide) => {
         clearButton.onclick = async () => {
           console.log('closing...');
           await slide.close();
           fileInput.value = null;
-          ctx2d.reset();
+          ctx2ds.forEach((ctx2d) => ctx2d.reset());
           console.log('closed');
         };
         console.log('opened');
@@ -52,32 +58,38 @@
         const [levelWidth, levelHeight] = await slide.getLevelDimensions(bestLevel);
         console.log('level dims', levelWidth, levelHeight);
         const region = await slide.readRegion(0, 0, bestLevel, levelWidth, levelHeight, true);
-        console.log('got region');
-        const imageData = new ImageData(region.slice(), levelWidth, levelHeight);
-
-        // Resize the image data to the desired width and height
-        const bitmap = await createImageBitmap(imageData, {
-          resizeWidth: targetWidth,
-          resizeHeight: targetHeight,
+        const halfWidth = Math.floor(width / 2);
+        const halfHeight = Math.floor(height / 2);
+        const halfLevelWidth = Math.floor(levelWidth / 2);
+        const halfLevelHeight = Math.floor(levelHeight / 2);
+        const halfTargetWidth = Math.floor(targetWidth / 2);
+        const halfTargetHeight = Math.floor(targetHeight / 2);
+        const regions = [
+          [0, 0],
+          [halfWidth, 0],
+          [0, halfHeight],
+          [halfWidth, halfHeight],
+        ];
+        const regionPromises = regions.map(([x, y]) => {
+          return slide.readRegion(x, y, bestLevel, halfLevelWidth, halfLevelHeight, true);
         });
+        const allRegions = await Promise.all(regionPromises);
+        allRegions.forEach(async (region, index) => {
+          const canvas = canvases[index];
+          const ctx2d = ctx2ds[index];
+          canvas.width = halfLevelWidth;
+          canvas.height = halfLevelHeight;
+          const imageData = new ImageData(region, halfLevelWidth, halfLevelHeight);
 
-        // const tempCanvas = document.createElement("canvas");
-        // tempCanvas.width = levelWidth;
-        // tempCanvas.height = levelHeight;
-        // const tempCtx = tempCanvas.getContext("2d");
-        // if (!tempCtx) {
-        //   throw new Error("Failed to get 2D context");
-        // }
-        // tempCtx.putImageData(imageData, 0, 0);
-
-        if (!ctx2d) {
-          throw new Error("Failed to get 2D context");
-        }
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-        // ctx2d.putImageData(imageData, 0, 0);
-        ctx2d.drawImage(bitmap, 0, 0);
-        // ctx2d.drawImage(tempCanvas, 0, 0, levelWidth, levelHeight, 0, 0, targetWidth, targetHeight);
+          // Resize the image tile data to the desired width and height
+          const bitmap = await createImageBitmap(imageData, {
+            resizeWidth: halfTargetWidth,
+            resizeHeight: halfTargetHeight,
+          });
+          canvas.width = halfTargetWidth;
+          canvas.height = halfTargetHeight;
+          ctx2d.drawImage(bitmap, 0, 0);
+        });
       }
 
       // On file input change, load the file and display it
@@ -118,6 +130,14 @@
     <div>
       <button id="clear">Clear</button>
     </div>
-    <canvas id="image" width="1px" height="1px" style="border: 5px solid black;"></canvas>
+    <div style="display: flex; flex-direction: row;">
+      <canvas id="image0" width="1px" height="1px" style="border: 1px solid black;"></canvas>
+      <canvas id="image1" width="1px" height="1px" style="border: 1px solid black;"></canvas>
+    </div>
+    <div style="display: flex; flex-direction: row;">
+      <canvas id="image2" width="1px" height="1px" style="border: 1px solid black;"></canvas>
+      <canvas id="image3" width="1px" height="1px" style="border: 1px solid black;"></canvas>
+    </div>
+    </div>
   </body>
 </html>
