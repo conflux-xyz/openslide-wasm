@@ -1,16 +1,13 @@
 /// <reference types="emscripten" />
 import { WorkerCommand, WorkerResponseBase, OpenSlideT } from "./types";
-// let createModule: EmscriptenModuleFactory<OpenSlideEmscriptenModule>;
-import createModule from "./lib.js";
+import createModule_ from "./lib.js";
 
-// NOTE: This is currently necessary because we have patched the openslide
-// source code to check for this prefix to know if a file is a local file
-// rather than a remote file which triggers fetch requests.
-const _TMP_LOCAL_PREFIX = "/tmp-local-";
+const createModule: EmscriptenModuleFactory<OpenSlideEmscriptenModule> = createModule_;
+
+const _TMP_PREFIX = "/tmp-";
 
 type Pointer = number;
 
-declare var WORKERFS: Emscripten.FileSystemType;
 declare function cwrap<I extends Array<Emscripten.JSType | null> | [], R extends Emscripten.JSType | null>(
     ident: string,
     returnType: R,
@@ -21,7 +18,8 @@ declare function cwrap<I extends Array<Emscripten.JSType | null> | [], R extends
 interface OpenSlideEmscriptenModule extends EmscriptenModule {
   FS: typeof FS;
   cwrap: typeof cwrap;
-  WORKERFS: typeof WORKERFS;
+  WORKERFS: Emscripten.FileSystemType;
+  MEMFS: Emscripten.FileSystemType;
   UTF8ToString: typeof UTF8ToString;
 }
 
@@ -35,11 +33,10 @@ function randomString(length: number = 10) {
 }
 
 
-async function fetchFileFromUrl(url: string) {
-  const response = await fetch(url);
+async function fetchFileFromUrl(url: URL) {
+  const filename = url.pathname.split("/").pop() || "filename";
+  const response = await fetch(url.toString());
   const blob = await response.blob();
-  const u = new URL(response.url);
-  const filename = u.pathname.split("/").pop() || "filename";
   const file = new File([blob], filename, { type: blob.type });
   return file;
 }
@@ -142,7 +139,8 @@ class OpenSlideApi {
   }
 
   async open(file: File | string, downloadToLocal: boolean = false) {
-    const {filename, mountDir} = await this._open_file(file, downloadToLocal);
+    const fileOrUrl = file instanceof File ? file : new URL(file);
+    const {filename, mountDir} = await this._open_file(fileOrUrl, downloadToLocal);
     const filepath = mountDir ? `${mountDir}/${filename}` : filename;
     const osr = await this._openSlideAsync(filepath);
     if (mountDir) {
@@ -151,8 +149,8 @@ class OpenSlideApi {
     return osr;
   }
 
-  async _open_file(file: File | string, downloadToLocal: boolean = false) {
-    if (typeof file === "string") {
+  async _open_file(file: File | URL, downloadToLocal: boolean = false) {
+    if (file instanceof URL) {
       if (downloadToLocal) {
         const fileObj = await fetchFileFromUrl(file);
         return {
@@ -161,8 +159,8 @@ class OpenSlideApi {
         };
       } else {
         return {
-          filename: file,
-          mountDir: null,
+          filename: "remote",
+          mountDir: this._mount_url(file),
         };
       }
     } else {
@@ -174,11 +172,19 @@ class OpenSlideApi {
   }
 
   _mount_file(file: File) {
-    const dirname = `${_TMP_LOCAL_PREFIX}${randomString()}`;
+    const dirname = `${_TMP_PREFIX}${randomString()}`;
     this.lib.FS.mkdir(dirname);
     this.lib.FS.mount(this.lib.WORKERFS, { files: [file] }, dirname)
     return dirname;
   }
+
+  _mount_url(url: URL) {
+    const dirname = `${_TMP_PREFIX}${randomString()}`;
+    this.lib.FS.mkdir(dirname);
+    this.lib.FS.mount(this.lib.MEMFS, {}, dirname)
+    const f = this.lib.FS.createLazyFile(dirname, "remote", url.toString(), true, false);
+    return dirname;
+  };
 
   async close(osr: OpenSlideT) {
     const mountDir = this._osrMountMap.get(osr);

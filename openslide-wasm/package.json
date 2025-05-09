@@ -1,11 +1,11 @@
 {
   "name": "@conflux-xyz/openslide-wasm",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "license": "MIT",
   "type": "module",
   "main": "dist/openslide.js",
   "scripts": {
-    "build": "yarn tsc -b . && npx esbuild src/openslide.ts --bundle --platform=browser --outfile=dist/openslide.js  --format=esm",
+    "build": "yarn tsc -b . && npx esbuild src/openslide.ts --bundle --platform=browser --outfile=dist/openslide.js  --format=esm && cp src/lib.wasm dist/lib.wasm",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest)"
   },
   "types": "dist/openslide.d.ts",

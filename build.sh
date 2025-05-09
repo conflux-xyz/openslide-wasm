@@ -195,5 +195,17 @@ fi
 
 # Build openslide wasm
 cd ${DEPS_DIRECTORY}
-(emcc -s FORCE_FILESYSTEM -lworkerfs.js -s WASM=1 -s SINGLE_FILE=1 -s MODULARIZE=1 -s EXPORT_NAME="createModule" -s EXPORT_ES6=1 -s ENVIRONMENT=web,worker -g -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -sASYNCIFY -s ALLOW_MEMORY_GROWTH -s EXPORTED_FUNCTIONS="[ '_malloc', '_free', 'FS', 'ccall', 'cwrap', 'UTF8ToString']" -s EXPORTED_RUNTIME_METHODS=FS,WORKERFS,HEAP8,HEAPU8,HEAP32,HEAPU32,HEAP64 -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
+
+# Notes:
+# - `-s ASYNCIFY=1` appears to be necessary for FS.createLazyFile to work.
+# - For development builds, consider removing -Os to speed up builds (~4x speedup).
+#   Also consider adding `-g` to add DWARF debug information.
+(emcc -s FORCE_FILESYSTEM -lworkerfs.js -s WASM=1 \
+    -Os \
+    -s MODULARIZE=1 -s EXPORT_NAME="createModule" -s EXPORT_ES6=1 \
+    -s ENVIRONMENT=web,worker \
+    -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -s ASYNCIFY=1 -s ALLOW_MEMORY_GROWTH \
+    -s EXPORTED_FUNCTIONS="[ '_malloc', '_free', 'FS', 'cwrap', 'UTF8ToString']" \
+    -s EXPORTED_RUNTIME_METHODS=FS,MEMFS,WORKERFS,HEAP8,HEAPU8,HEAP32,HEAP64 \
+    -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
       ../openslide-wasm/openslide-api.c -o ../openslide-wasm/src/lib.js) || { echo 'openslide-wasm build failed'; exit 1; }
