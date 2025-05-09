@@ -129,12 +129,18 @@ class OpenSlideApi {
     this.lib._free(args);
 
     const sz = width * height * 4;
-    const imageArray = new Uint8ClampedArray(
+
+    const imageArrayView = new Uint8ClampedArray(
       this.lib.HEAPU8.buffer,
       data,
       sz,
     );
+    // Copy the data from WASM memory, otherwise we
+    // will get a view of the memory that will be freed
+    // and might change!
+    const imageArray = imageArrayView.slice();
     this.lib._free(data);
+
     return imageArray;
   }
 
