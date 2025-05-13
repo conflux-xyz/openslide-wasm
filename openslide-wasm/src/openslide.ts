@@ -229,3 +229,5 @@ class OpenSlideImage {
     return response.payload.data;
   }
 }
+
+export type { OpenSlideImage };
