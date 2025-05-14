@@ -5,7 +5,7 @@
       import OpenSlide from "/openslide-wasm/dist/openslide.js";
 
       async function initialize() {
-        window.openslide = new OpenSlide();
+        window.openslide = new OpenSlide(4);
         console.log('created');
         await openslide.initialize();
         console.log('initialized');
@@ -17,25 +17,19 @@
 
       const downloadRemoteCheckbox = document.getElementById("downloadRemote");
       const mppInput = document.getElementById("mpp");
+      const numPartitionsInput = document.getElementById("num-partitions");
       const fileInput = document.getElementById("file");
       const remoteUrlInput = document.getElementById("remoteUrl");
       const loadRemoteButton = document.getElementById("loadRemote");
       const clearButton = document.getElementById("clear");
-      const canvases = [0, 1, 2, 3].map((i) => document.getElementById(`image${i}`));
-      const ctx2ds = canvases.map((canvas) => {
-        const ctx2d = canvas.getContext("2d");
-        if (!ctx2d) {
-          throw new Error("Failed to get 2D context");
-        }
-        return ctx2d;
-      });
+      const canvasContainer = document.getElementById("canvas-container");
 
       const handleSlide = async (slide) => {
         clearButton.onclick = async () => {
           console.log('closing...');
           await slide.close();
           fileInput.value = null;
-          ctx2ds.forEach((ctx2d) => ctx2d.reset());
+          canvasContainer.innerHTML = "";
           console.log('closed');
         };
         console.log('opened');
@@ -47,6 +41,8 @@
         const slideMpp = parseFloat(slideMppStr);
         console.log("Slide MPP", slideMpp);
         const mpp = parseFloat(mppInput.value);
+        const numPartitions = parseInt(numPartitionsInput.value);
+        canvasContainer.style.gridTemplateColumns = `repeat(${numPartitions}, auto)`;
         const downsample = mpp / slideMpp;
         const [width, height] = await slide.getLevelDimensions(0);
         const targetWidth = Math.round(width / downsample);
@@ -57,38 +53,44 @@
         console.log("Best level for downsample", bestLevel);
         const [levelWidth, levelHeight] = await slide.getLevelDimensions(bestLevel);
         console.log('level dims', levelWidth, levelHeight);
-        const region = await slide.readRegion(0, 0, bestLevel, levelWidth, levelHeight, true);
-        const halfWidth = Math.floor(width / 2);
-        const halfHeight = Math.floor(height / 2);
-        const halfLevelWidth = Math.floor(levelWidth / 2);
-        const halfLevelHeight = Math.floor(levelHeight / 2);
-        const halfTargetWidth = Math.floor(targetWidth / 2);
-        const halfTargetHeight = Math.floor(targetHeight / 2);
-        const regions = [
-          [0, 0],
-          [halfWidth, 0],
-          [0, halfHeight],
-          [halfWidth, halfHeight],
-        ];
-        const regionPromises = regions.map(([x, y]) => {
-          return slide.readRegion(x, y, bestLevel, halfLevelWidth, halfLevelHeight, true);
-        });
+
+        const regionWidth = Math.floor(width / numPartitions);
+        const regionHeight = Math.floor(height / numPartitions);
+        const regionLevelWidth = Math.floor(levelWidth / numPartitions);
+        const regionLevelHeight = Math.floor(levelHeight / numPartitions);
+        const regionTargetWidth = Math.floor(targetWidth / numPartitions);
+        const regionTargetHeight = Math.floor(targetHeight / numPartitions);
+
+        const regionPromises = [];
+        for (let j = 0; j < numPartitions; j++) {
+          for (let i = 0; i < numPartitions; i++) {
+            const x = i * regionWidth;
+            const y = j * regionHeight;
+            regionPromises.push(
+              slide.readRegion(x, y, bestLevel, regionLevelWidth, regionLevelHeight, true)
+            );
+          }
+        }
+        console.time('readRegion');
         const allRegions = await Promise.all(regionPromises);
+        console.timeEnd('readRegion');
         allRegions.forEach(async (region, index) => {
-          const canvas = canvases[index];
-          const ctx2d = ctx2ds[index];
-          canvas.width = halfLevelWidth;
-          canvas.height = halfLevelHeight;
-          const imageData = new ImageData(region, halfLevelWidth, halfLevelHeight);
+          const imageData = new ImageData(region, regionLevelWidth, regionLevelHeight);
 
           // Resize the image tile data to the desired width and height
           const bitmap = await createImageBitmap(imageData, {
-            resizeWidth: halfTargetWidth,
-            resizeHeight: halfTargetHeight,
+            resizeWidth: regionTargetWidth,
+            resizeHeight: regionTargetHeight,
           });
-          canvas.width = halfTargetWidth;
-          canvas.height = halfTargetHeight;
+
+          const canvas = document.createElement("canvas");
+          const ctx2d = canvas.getContext("2d");
+          canvas.style.border = "1px solid black";
+          canvas.width = regionTargetWidth;
+          canvas.height = regionTargetHeight;
           ctx2d.drawImage(bitmap, 0, 0);
+
+          canvasContainer.appendChild(canvas);
         });
       }
 
@@ -128,15 +130,13 @@
       <input type="number" id="mpp" placeholder="MPP" value="40.0" step="0.01"/>
     </div>
     <div>
+      <label for="num-partitions">Partitions</label>
+      <input type="number" id="num-partitions" placeholder="Num Partitions" value="4" step="1"/>
+    </div>
+    <div>
       <button id="clear">Clear</button>
     </div>
-    <div style="display: flex; flex-direction: row;">
-      <canvas id="image0" width="1px" height="1px" style="border: 1px solid black;"></canvas>
-      <canvas id="image1" width="1px" height="1px" style="border: 1px solid black;"></canvas>
-    </div>
-    <div style="display: flex; flex-direction: row;">
-      <canvas id="image2" width="1px" height="1px" style="border: 1px solid black;"></canvas>
-      <canvas id="image3" width="1px" height="1px" style="border: 1px solid black;"></canvas>
+    <div id="canvas-container" style="display: inline-grid; grid-template-columns: repeat(2, auto);">
     </div>
     </div>
   </body>
