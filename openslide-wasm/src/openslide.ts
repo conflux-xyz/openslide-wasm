@@ -24,11 +24,12 @@ class OpenSlideWorker {
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const { data } = event;
       const id = data.id;
-      const promiseFns = this.promiseFns.get(id);
-      if (!promiseFns) {
+      const promiseFn = this.promiseFns.get(id);
+      if (!promiseFn) {
         return;
       }
-      const { resolve, reject } = promiseFns;
+      this.promiseFns.delete(id);
+      const { resolve, reject } = promiseFn;
       if (data.type === "error") {
         reject(new Error(data.payload.message));
       } else {
