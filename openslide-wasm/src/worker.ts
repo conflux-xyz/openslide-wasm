@@ -33,15 +33,6 @@ function randomString(length: number = 10) {
 }
 
 
-async function fetchFileFromUrl(url: URL) {
-  const filename = url.pathname.split("/").pop() || "filename";
-  const response = await fetch(url.toString());
-  const blob = await response.blob();
-  const file = new File([blob], filename, { type: blob.type });
-  return file;
-}
-
-
 class OpenSlideApi {
   private _getPropertyNamesAsync: (osr: OpenSlideT) => Promise<Pointer>;
   private _getPropertyValueAsync: (osr: OpenSlideT, name: string) => Promise<Pointer>;
@@ -144,9 +135,9 @@ class OpenSlideApi {
     return imageArray;
   }
 
-  async open(file: File | string, downloadToLocal: boolean = false) {
+  async open(file: File | string) {
     const fileOrUrl = file instanceof File ? file : new URL(file);
-    const {filename, mountDir} = await this._open_file(fileOrUrl, downloadToLocal);
+    const {filename, mountDir} = await this._open_file(fileOrUrl);
     const filepath = mountDir ? `${mountDir}/${filename}` : filename;
     const osr = await this._openSlideAsync(filepath);
     if (mountDir) {
@@ -155,20 +146,12 @@ class OpenSlideApi {
     return osr;
   }
 
-  async _open_file(file: File | URL, downloadToLocal: boolean = false) {
+  async _open_file(file: File | URL) {
     if (file instanceof URL) {
-      if (downloadToLocal) {
-        const fileObj = await fetchFileFromUrl(file);
-        return {
-          filename: fileObj.name,
-          mountDir: this._mount_file(fileObj),
-        };
-      } else {
-        return {
-          filename: "remote",
-          mountDir: this._mount_url(file),
-        };
-      }
+      return {
+        filename: "remote",
+        mountDir: this._mount_url(file),
+      };
     } else {
       return {
         filename: file.name,
@@ -248,8 +231,8 @@ async function handleMessage(
       break;
     }
     case "open": {
-      const {file, downloadToLocal} = data.payload;
-      const osr = await api.open(file, downloadToLocal);
+      const {file} = data.payload;
+      const osr = await api.open(file);
       doPostMessage(id, {type: "open", payload: {osr}});
       break;
     }

@@ -74,8 +74,12 @@ export default class OpenSlide {
 
   async open(file: File | URL | string, downloadToLocal: boolean = false): Promise<OpenSlideImage> {
     const fileOrUrl = ensureFileOrUrl(file);
+    if (fileOrUrl instanceof URL && downloadToLocal) {
+      const file = await fetchFileFromUrl(fileOrUrl);
+      return await this.open(file, false);
+    }
     const fileOrString = fileOrUrl instanceof URL ? fileOrUrl.toString() : fileOrUrl;
-    const responses = await Promise.all(this.workers.map((w) => w.sendCommand({ type: "open", payload: { file: fileOrString, downloadToLocal } })));
+    const responses = await Promise.all(this.workers.map((w) => w.sendCommand({ type: "open", payload: { file: fileOrString } })));
     const handles = responses.map((response, idx) => {
       if (response.type === "error") {
         throw new Error(response.payload.message);
@@ -111,6 +115,18 @@ function ensureFileOrUrl(file: File | URL | string): File | URL {
   } catch (e) {
     throw new Error("Invalid URL");
   }
+}
+
+
+async function fetchFileFromUrl(url: URL) {
+  const filename = url.pathname.split("/").pop() || "filename";
+  console.log("Fetching file from URL:", url.toString());
+  const response = await fetch(url.toString());
+  console.log("Response status:", response.status);
+  const blob = await response.blob();
+  console.log("Blob size:", blob.size);
+  const file = new File([blob], filename, { type: blob.type });
+  return file;
 }
 
 
