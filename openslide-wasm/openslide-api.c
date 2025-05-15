@@ -3,7 +3,6 @@
 #include <openslide/openslide.h>
 #include <emscripten/emscripten.h>
 
-
 EMSCRIPTEN_KEEPALIVE
 void* load_image(void* url) {
     void* ptr = openslide_open((const char*)url);
