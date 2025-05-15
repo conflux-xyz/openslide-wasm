@@ -14,64 +14,102 @@ function randomString(length: number = 10) {
 }
 
 class OpenSlideWorker {
-  _worker: Worker;
-  _promiseFns: Map<string, PromiseFns>;
+  id: string;
+  private worker: Worker;
+  private promiseFns: Map<string, PromiseFns>;
 
   constructor() {
-    this._worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
-    this._worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+    this.id = randomString(16);
+    this.worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const { data } = event;
       const id = data.id;
-      const promiseFns = this._promiseFns.get(id);
-      if (!promiseFns) {
+      const promiseFn = this.promiseFns.get(id);
+      if (!promiseFn) {
         return;
       }
-      const { resolve, reject } = promiseFns;
+      this.promiseFns.delete(id);
+      const { resolve, reject } = promiseFn;
       if (data.type === "error") {
         reject(new Error(data.payload.message));
       } else {
         resolve(data);
       }
     };
-    this._promiseFns = new Map();
+    this.promiseFns = new Map();
+  }
+
+  numTasks(): number {
+    return this.promiseFns.size;
   }
 
   sendCommand(command: WorkerCommandBase): Promise<WorkerResponse> {
     const id = randomString(16);
     return new Promise<WorkerResponse>((resolve, reject) => {
-      this._worker.postMessage({ ...command, id });
-      this._promiseFns.set(id, { resolve, reject });
+      this.worker.postMessage({ ...command, id });
+      this.promiseFns.set(id, { resolve, reject });
     });
   }
 
 }
 
+export interface OpenSlideOptions {
+  workers?: number;
+}
 export default class OpenSlide {
-  private worker: OpenSlideWorker;
+  private workers: OpenSlideWorker[];
 
-  constructor() {
-    this.worker = new OpenSlideWorker();
+  /**
+   * Creates an instance of OpenSlide with a specified number of workers.
+   * 
+   * @param {OpenSlideOptions} options - Options for OpenSlide.
+   * @param {number} options.workers - The number of workers to create (default: 1).
+   * @returns {OpenSlide} An instance of OpenSlide.
+   * @throws {Error} If the number of workers is less than 1.
+   */
+  constructor({
+    workers = 1,
+  }: OpenSlideOptions) {
+    if (workers < 1) {
+      throw new Error("Number of workers must be at least 1");
+    }
+    this.workers = [];
+    for (let i = 0; i < workers; i++) {
+      this.workers.push(new OpenSlideWorker());
+    }
   }
 
   async initialize() {
-    const p = await this.worker.sendCommand({ type: "init" });
-    if (p.type === "error") {
-      throw new Error(p.payload.message);
+    const results = await Promise.all(this.workers.map((w) => w.sendCommand({ type: "init" })));
+    for (const p of results) {
+      if (p.type === "error") {
+        throw new Error(p.payload.message);
+      }
     }
     return;
   }
 
   async open(file: File | URL | string, downloadToLocal: boolean = false): Promise<OpenSlideImage> {
     const fileOrUrl = ensureFileOrUrl(file);
+    if (fileOrUrl instanceof URL && downloadToLocal) {
+      const file = await fetchFileFromUrl(fileOrUrl);
+      return await this.open(file, false);
+    }
     const fileOrString = fileOrUrl instanceof URL ? fileOrUrl.toString() : fileOrUrl;
-    const response = await this.worker.sendCommand({ type: "open", payload: { file: fileOrString, downloadToLocal } });
-    if (response.type === "error") {
-      throw new Error(response.payload.message);
-    }
-    if (response.type !== "open") {
-      throw new Error("Unexpected response type");
-    }
-    return new OpenSlideImage(response.payload.osr, this.worker);
+    const responses = await Promise.all(this.workers.map((w) => w.sendCommand({ type: "open", payload: { file: fileOrString } })));
+    const handles = responses.map((response, idx) => {
+      if (response.type === "error") {
+        throw new Error(response.payload.message);
+      }
+      if (response.type !== "open") {
+        throw new Error("Unexpected response type");
+      }
+      return {
+        osr: response.payload.osr,
+        worker: this.workers[idx],
+      };
+    });
+    return new OpenSlideImage(handles);
   }
 }
 
@@ -96,8 +134,26 @@ function ensureFileOrUrl(file: File | URL | string): File | URL {
   }
 }
 
+
+async function fetchFileFromUrl(url: URL) {
+  const filename = url.pathname.split("/").pop() || "filename";
+  console.log("Fetching file from URL:", url.toString());
+  const response = await fetch(url.toString());
+  console.log("Response status:", response.status);
+  const blob = await response.blob();
+  console.log("Blob size:", blob.size);
+  const file = new File([blob], filename, { type: blob.type });
+  return file;
+}
+
+
+interface OpenSlideHandle {
+  osr: OpenSlideT;
+  worker: OpenSlideWorker;
+}
+
 class OpenSlideImage {
-  constructor(private osr: OpenSlideT, private worker: OpenSlideWorker) {
+  constructor(private handles: OpenSlideHandle[]) {
   }
 
   /**
@@ -105,21 +161,36 @@ class OpenSlideImage {
    * @returns A promise that resolves when the image is closed.
    */
   async close() {
-    const response = await this.worker.sendCommand({ type: "close", payload: { osr: this.osr } });
-    if (response.type === "error") {
-      throw new Error(response.payload.message);
-    }
-    if (response.type !== "close") {
-      throw new Error("Unexpected response type");
+    const responses = await Promise.all(this.handles.map(({osr, worker}) => worker.sendCommand({ type: "close", payload: { osr } })));
+    for (const response of responses) {
+      if (response.type === "error") {
+        throw new Error(response.payload.message);
+      }
+      if (response.type !== "close") {
+        throw new Error("Unexpected response type");
+      }
     }
   }
+
+
+  private getHandle(): OpenSlideHandle {
+    const sizes = this.handles.map((h) => h.worker.numTasks());
+    const minSize = Math.min(...sizes);
+    const minHandles = this.handles.filter((_, idx) => sizes[idx] === minSize);
+    const possibleHandles = minHandles.length === 0 ? this.handles : minHandles;
+    const index = Math.floor(Math.random() * possibleHandles.length);
+    const handle = possibleHandles[index];
+    return handle;
+  }
+
 
   /**
    * Get the names of all properties in the image.
    * @returns An array of property names.
    */
   async getPropertyNames(): Promise<string[]> {
-    const response = await this.worker.sendCommand({ type: "getPropertyNames", payload: { osr: this.osr } });
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "getPropertyNames", payload: { osr } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -135,7 +206,8 @@ class OpenSlideImage {
    * @returns The value of the property, or null if not found.
    */
   async getPropertyValue(name: string): Promise<string | null> {
-    const response = await this.worker.sendCommand({ type: "getPropertyValue", payload: { osr: this.osr, name } });
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "getPropertyValue", payload: { osr, name } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -150,7 +222,8 @@ class OpenSlideImage {
    * @returns The number of levels in the image.
    */
   async getLevelCount(): Promise<number> {
-    const response = await this.worker.sendCommand({ type: "getLevelCount", payload: { osr: this.osr } });
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "getLevelCount", payload: { osr } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -166,7 +239,8 @@ class OpenSlideImage {
    * @returns The dimensions of the specified level as a tuple [width, height].
    */
   async getLevelDimensions(level: number): Promise<[number, number]> {
-    const response = await this.worker.sendCommand({ type: "getLevelDimensions", payload: { osr: this.osr, level } });
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "getLevelDimensions", payload: { osr, level } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -182,7 +256,8 @@ class OpenSlideImage {
    * @returns The downsample factor for the specified level.
    */
   async getLevelDownsample(level: number): Promise<number> {
-    const response = await this.worker.sendCommand({ type: "getLevelDownsample", payload: { osr: this.osr, level } });
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "getLevelDownsample", payload: { osr, level } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -198,7 +273,8 @@ class OpenSlideImage {
    * @returns The best level for the specified downsample factor.
    */
   async getBestLevelForDownsample(downsample: number): Promise<number> {
-    const response = await this.worker.sendCommand({ type: "getBestLevelForDownsample", payload: { osr: this.osr, downsample } });
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "getBestLevelForDownsample", payload: { osr, downsample } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
@@ -219,7 +295,8 @@ class OpenSlideImage {
    * @returns A promise that resolves to a Uint8ClampedArray containing the pixel data.
    */
   async readRegion(x: number, y: number, level: number, width: number, height: number, readRgba: boolean = false): Promise<Uint8ClampedArray> {
-    const response = await this.worker.sendCommand({ type: "readRegion", payload: { osr: this.osr, x, y, level, width, height, readRgba } });
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "readRegion", payload: { osr, x, y, level, width, height, readRgba } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }

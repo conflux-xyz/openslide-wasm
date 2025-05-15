@@ -2,7 +2,7 @@ export type OpenSlideT = number;
 
 export type WorkerCommandBase =
   | {type: "init"}
-  | {type: "open", payload: {file: File | string, downloadToLocal?: boolean}}
+  | {type: "open", payload: {file: File | string}}
   | {type: "close", payload: {osr: OpenSlideT}}
   | {type: "getPropertyNames", payload: {osr: OpenSlideT}}
   | {type: "getPropertyValue", payload: {osr: OpenSlideT, name: string}}
