@@ -1,3 +1,7 @@
+#!/usr/bin/env sh
+
+set -e 
+
 export DEPENDENCIES_DIR=external
 export SOURCE_HOME=$(pwd)/${DEPENDENCIES_DIR}
 
@@ -9,11 +13,7 @@ git clone  --depth 1 --branch v1.3.1 https://github.com/madler/zlib.git
 
 # libjpeg-turbo
 cd ${SOURCE_HOME}
-git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git
-cd libjpeg-turbo
-# version 3.1.0
-git checkout 20ade4d
-# git checkout e0e18de
+git clone --depth 1 --branch 3.1.0 https://github.com/libjpeg-turbo/libjpeg-turbo.git
 
 # zstd
 cd ${SOURCE_HOME}
@@ -23,7 +23,7 @@ git checkout 80af41e
 
 # libffi
 cd ${SOURCE_HOME}
-git clone --depth 1 https://github.com/libffi/libffi.git
+git clone https://github.com/libffi/libffi.git
 cd libffi
 git checkout ac598b7
 
@@ -36,11 +36,7 @@ git apply ${SOURCE_HOME}/../patches/glib.patch
 
 # libpng
 cd ${SOURCE_HOME}
-git clone https://github.com/emscripten-ports/libpng.git
-cd libpng
-# version 1.6.48
-git checkout ea12796
-# git checkout 918d23f
+git clone --depth 1 --branch v1.6.48 https://github.com/pnggroup/libpng.git
  
 # pixman
 cd ${SOURCE_HOME}
@@ -70,10 +66,7 @@ git apply ${SOURCE_HOME}/../patches/cairo.patch
 
 # openjpeg
 cd ${SOURCE_HOME}
-git clone https://github.com/uclouvain/openjpeg.git
-cd openjpeg
-# version 2.5.3
-git checkout 210a8a5
+git clone --depth 1 --branch v2.5.3 https://github.com/uclouvain/openjpeg.git
 
 # libxml2
 cd ${SOURCE_HOME}
