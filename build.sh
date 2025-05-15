@@ -57,7 +57,7 @@ emcmake cmake . \
     -DPNG_SHARED=OFF \
     -DPNG_TESTS=OFF \
     -DZLIB_INCLUDE_DIR=${BUILD_DIRECTORY}/include/ \
-    -DM_LIBRARY=""
+    -DZLIB_LIBRARY=${BUILD_DIRECTORY}/lib/libz.a
 emmake make install
 else
 echo 'libpng found. Skipping build.';
@@ -201,6 +201,17 @@ else
 echo 'cairo found. Skipping build.';
 fi
 
+# Build libtiff
+echo "=========="
+echo "Building libtiff"
+if [ ! -f "$PKG_CONFIG_LIBDIR/libtiff.a" ]; then
+cd ${DEPS_DIRECTORY}/libtiff
+(CFLAGS="${DEFAULT_CFLAGS}" LDFLAGS="${DEFAULT_LDFLAGS}" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release -Djpeg=enabled -Dpkg_config_path=${PKG_CONFIG_PATH} && \
+    meson install -C _build) || { echo 'libtiff build failed'; exit 1; }
+else
+echo 'libtiff found. Skipping build.';
+fi
+
 # Build openjpeg
 echo "=========="
 echo "Building openjpeg"
@@ -211,6 +222,13 @@ cd ${DEPS_DIRECTORY}/openjpeg
     -DCMAKE_EXE_LINKER_FLAGS="${DEFAULT_LDFLAGS}" \
     -DCMAKE_SHARED_LINKER_FLAGS="${DEFAULT_LDFLAGS}" \
     -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_CODEC=OFF \
+    -DZLIB_INCLUDE_DIR=${BUILD_DIRECTORY}/include/ \
+    -DZLIB_LIBRARY=${BUILD_DIRECTORY}/lib/libz.a \
+    -DTIFF_INCLUDE_DIR=${BUILD_DIRECTORY}/include/ \
+    -DTIFF_LIBRARY=${BUILD_DIRECTORY}/lib/libtiff.a \
+    -DPNG_LIBRARY=${BUILD_DIRECTORY}/lib/libpng16.a \
+    -DPNG_PNG_INCLUDE_DIR=${BUILD_DIRECTORY}/include/ \
     -DCMAKE_INSTALL_PREFIX=${BUILD_DIRECTORY} && \
 emmake make install) || { echo 'openjpeg build failed'; exit 1; }
 else
@@ -233,7 +251,7 @@ echo "=========="
 echo "Building gdk-pixbuf"
 if [ ! -f "$PKG_CONFIG_LIBDIR/libgdk_pixbuf-2.0.a" ]; then
 cd ${DEPS_DIRECTORY}/gdk-pixbuf
-(CFLAGS="${DEFAULT_CFLAGS} $(pkg-config --cflags libpng libzstd libtiff-4 libopenjp2 glib-2.0) -s USE_LIBJPEG=1" LDFLAGS="${DEFAULT_LDFLAGS} $(pkg-config --libs libzstd libpng libtiff-4 libopenjp2 glib-2.0) -s USE_LIBJPEG=1" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS -Dgio_sniffing=false -Ddocs=false -Dtests=false --default-library=static --buildtype=release  && \
+(CFLAGS="${DEFAULT_CFLAGS} $(pkg-config --cflags libpng libzstd libtiff-4 libopenjp2 glib-2.0 libjpeg)" LDFLAGS="${DEFAULT_LDFLAGS} $(pkg-config --libs libzstd libpng libtiff-4 libopenjp2 glib-2.0 libjpeg)" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS -Dgio_sniffing=false -Ddocs=false -Dtests=false --default-library=static --buildtype=release  && \
     meson install -C _build) || { echo 'gdk-pixbuf build failed'; exit 1; }
 else
 echo 'gdk-pixbuf found. Skipping build.';
@@ -250,23 +268,12 @@ else
 echo 'sqlite3 found. Skipping build.';
 fi
 
-# Build libtiff
-echo "=========="
-echo "Building libtiff"
-if [ ! -f "$PKG_CONFIG_LIBDIR/libtiff.a" ]; then
-cd ${DEPS_DIRECTORY}/libtiff
-(CFLAGS="${DEFAULT_CFLAGS} -s USE_LIBJPEG=1" LDFLAGS="${DEFAULT_LDFLAGS} -s USE_LIBJPEG=1" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
-    meson install -C _build) || { echo 'libtiff build failed'; exit 1; }
-else
-echo 'libtiff found. Skipping build.';
-fi
-
 # Build openslide
 echo "=========="
 echo "Building openslide"
 if [ ! -f "$PKG_CONFIG_LIBDIR/libopenslide.a" ]; then
 cd ${DEPS_DIRECTORY}/openslide
-(CFLAGS="${DEFAULT_CFLAGS} -s USE_LIBJPEG=1 -s USE_ZLIB=1 $(pkg-config --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0 cairo)" LDFLAGS="${DEFAULT_LDFLAGS} -s USE_LIBJPEG=1 $(pkg-config --libs glib-2.0 cairo)" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
+(CFLAGS="${DEFAULT_CFLAGS} $(pkg-config --cflags sqlite3 gdk-pixbuf-2.0 libtiff-4 libopenjp2 glib-2.0 cairo libjpeg)" LDFLAGS="${DEFAULT_LDFLAGS} $(pkg-config --libs glib-2.0 cairo libjpeg)" meson setup _build --prefix=${BUILD_DIRECTORY} --cross-file=$MESON_CROSS --default-library=static --buildtype=release  && \
     meson install -C _build) || { echo 'openslide build failed'; exit 1; }
 else
 echo 'openslide found. Skipping build.';
@@ -290,5 +297,5 @@ cd ${DEPS_DIRECTORY}
     -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -s ASYNCIFY=1 -s ALLOW_MEMORY_GROWTH \
     -s EXPORTED_FUNCTIONS="[ '_malloc', '_free', 'FS', 'cwrap', 'UTF8ToString']" \
     -s EXPORTED_RUNTIME_METHODS=FS,MEMFS,WORKERFS,HEAP8,HEAPU8,HEAP32,HEAP64 \
-    -s USE_LIBPNG=1 $(pkg-config --libs --cflags openslide glib-2.0) \
+    $(pkg-config --libs --cflags openslide glib-2.0) \
       ../openslide-wasm/openslide-api.c -o ../openslide-wasm/src/lib.js) || { echo 'openslide-wasm build failed'; exit 1; }

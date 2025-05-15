@@ -5,20 +5,21 @@ mkdir ${DEPENDENCIES_DIR}
 
 # zlib
 cd ${SOURCE_HOME}
-git clone  --depth 1 --branch v1.2.13 https://github.com/madler/zlib.git
+git clone  --depth 1 --branch v1.3.1 https://github.com/madler/zlib.git
 
 # libjpeg-turbo
 cd ${SOURCE_HOME}
 git clone https://github.com/libjpeg-turbo/libjpeg-turbo.git
 cd libjpeg-turbo
-git checkout e0e18de
+# version 3.1.0
+git checkout 20ade4d
+# git checkout e0e18de
 
 # zstd
 cd ${SOURCE_HOME}
 git clone https://github.com/facebook/zstd.git
 cd zstd
 git checkout 80af41e
-cd zstd/build/meson
 
 # libffi
 cd ${SOURCE_HOME}
@@ -37,7 +38,9 @@ git apply ${SOURCE_HOME}/../patches/glib.patch
 cd ${SOURCE_HOME}
 git clone https://github.com/emscripten-ports/libpng.git
 cd libpng
-git checkout 918d23f
+# version 1.6.48
+git checkout ea12796
+# git checkout 918d23f
  
 # pixman
 cd ${SOURCE_HOME}
@@ -69,7 +72,8 @@ git apply ${SOURCE_HOME}/../patches/cairo.patch
 cd ${SOURCE_HOME}
 git clone https://github.com/uclouvain/openjpeg.git
 cd openjpeg
-git checkout 2d60670
+# version 2.5.3
+git checkout 210a8a5
 
 # libxml2
 cd ${SOURCE_HOME}
