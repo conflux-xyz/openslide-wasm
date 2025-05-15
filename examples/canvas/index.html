@@ -5,7 +5,7 @@
       import OpenSlide from "/openslide-wasm/dist/openslide.js";
 
       async function initialize() {
-        window.openslide = new OpenSlide(4);
+        window.openslide = new OpenSlide({workers: 4});
         console.log('created');
         await openslide.initialize();
         console.log('initialized');

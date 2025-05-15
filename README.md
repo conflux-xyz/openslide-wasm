@@ -13,7 +13,7 @@ To use the library you just need to add `openslide.js` directory to your web pro
 <script language="javascript" type="module">
   import OpenSlide from "./openslide.js";
   async function run() {
-   const ctx = new OpenSlide();
+   const ctx = new OpenSlide({workers: 1});
    await ctx.initialize();
    const image = await ctx.open("sample.svs");
    const numLevels = await image.getLevelCount();

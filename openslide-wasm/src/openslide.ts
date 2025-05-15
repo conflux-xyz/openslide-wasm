@@ -53,19 +53,28 @@ class OpenSlideWorker {
 
 }
 
+export interface OpenSlideOptions {
+  workers?: number;
+}
 export default class OpenSlide {
   private workers: OpenSlideWorker[];
 
   /**
    * Creates an instance of OpenSlide with a specified number of workers.
    * 
-   * @param {number} [workerPoolSize=1] - The number of workers to initialize in the pool.
-   * Must be a positive integer. A larger pool size may improve performance for
-   * concurrent tasks but will consume more system resources.
+   * @param {OpenSlideOptions} options - Options for OpenSlide.
+   * @param {number} options.workers - The number of workers to create (default: 1).
+   * @returns {OpenSlide} An instance of OpenSlide.
+   * @throws {Error} If the number of workers is less than 1.
    */
-  constructor(workerPoolSize: number = 1) {
+  constructor({
+    workers = 1,
+  }: OpenSlideOptions) {
+    if (workers < 1) {
+      throw new Error("Number of workers must be at least 1");
+    }
     this.workers = [];
-    for (let i = 0; i < workerPoolSize; i++) {
+    for (let i = 0; i < workers; i++) {
       this.workers.push(new OpenSlideWorker());
     }
   }
