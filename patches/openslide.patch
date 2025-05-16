@@ -17,7 +17,7 @@ index d45ac05..4d619e9 100644
 +subdir('common')
 \ No newline at end of file
 diff --git a/src/openslide-decode-tifflike.c b/src/openslide-decode-tifflike.c
-index fb254c8..1c3c976 100644
+index fb254c8..fff0bad 100644
 --- a/src/openslide-decode-tifflike.c
 +++ b/src/openslide-decode-tifflike.c
 @@ -698,8 +698,6 @@ static void print_tag(struct _openslide_tifflike *tl,
@@ -29,3 +29,212 @@ index fb254c8..1c3c976 100644
    switch (item->type) {
    case TIFF_ASCII: {
      // will only print first string if there are multiple
+@@ -777,11 +775,15 @@ static int tag_compare(gconstpointer a, gconstpointer b) {
+   }
+ }
+ 
++static int tag_compare_with_data(gconstpointer a, gconstpointer b, gconstpointer user_data) {
++  return tag_compare(a, b);
++}
++
+ static void print_directory(struct _openslide_tifflike *tl,
+                             int64_t dir) {
+   struct tiff_directory *d = tl->directories->pdata[dir];
+   g_autoptr(GList) keys = g_hash_table_get_keys(d->items);
+-  keys = g_list_sort(keys, tag_compare);
++  keys = g_list_sort(keys, (GCompareFunc) tag_compare_with_data);
+   for (GList *el = keys; el; el = el->next) {
+     print_tag(tl, dir, GPOINTER_TO_INT(el->data));
+   }
+diff --git a/src/openslide-grid.c b/src/openslide-grid.c
+index 260b4f1..187f2ae 100644
+--- a/src/openslide-grid.c
++++ b/src/openslide-grid.c
+@@ -651,6 +651,10 @@ static int range_compare_tiles(gconstpointer a, gconstpointer b) {
+   }
+ }
+ 
++static int range_compare_tiles_with_data(gconstpointer a, gconstpointer b, gconstpointer user_data) {
++  return range_compare_tiles(a, b);
++}
++
+ static void range_get_bounds(struct _openslide_grid *_grid,
+                              struct bounds *bounds) {
+   struct range_grid *grid = (struct range_grid *) _grid;
+@@ -716,7 +720,7 @@ static bool range_paint_region(struct _openslide_grid *_grid,
+       }
+     }
+   }
+-  tiles = g_list_sort(tiles, range_compare_tiles);
++  tiles = g_list_sort(tiles, (GCompareFunc) range_compare_tiles_with_data);
+ 
+   // draw tiles
+   struct range_tile *prev_tile = NULL;
+diff --git a/src/openslide-vendor-dicom.c b/src/openslide-vendor-dicom.c
+index 8b0a522..7dfa017 100644
+--- a/src/openslide-vendor-dicom.c
++++ b/src/openslide-vendor-dicom.c
+@@ -1070,6 +1070,10 @@ static gint compare_level_width(const void *a, const void *b) {
+   return bb->base.w - aa->base.w;
+ }
+ 
++static gint compare_level_width_with_data(const void *a, const void *b, const void *user_data) {
++  return compare_level_width(a, b);
++}
++
+ static bool dicom_open(openslide_t *osr,
+                        const char *filename,
+                        struct _openslide_tifflike *tl G_GNUC_UNUSED,
+@@ -1144,7 +1148,7 @@ static bool dicom_open(openslide_t *osr,
+   }
+ 
+   // sort levels by width
+-  g_ptr_array_sort(level_array, compare_level_width);
++  g_ptr_array_sort(level_array, (GCompareFunc) compare_level_width_with_data);
+ 
+   struct dicom_level *level0 = level_array->pdata[0];
+   add_properties(osr, level0);
+diff --git a/src/openslide-vendor-generic-tiff.c b/src/openslide-vendor-generic-tiff.c
+index 1200eea..45a6690 100644
+--- a/src/openslide-vendor-generic-tiff.c
++++ b/src/openslide-vendor-generic-tiff.c
+@@ -201,6 +201,10 @@ static int width_compare(gconstpointer a, gconstpointer b) {
+   }
+ }
+ 
++static int width_compare_with_data(gconstpointer a, gconstpointer b, gconstpointer user_data) {
++  return width_compare(a, b);
++}
++
+ static bool generic_tiff_open(openslide_t *osr,
+                               const char *filename,
+                               struct _openslide_tifflike *tl,
+@@ -268,7 +272,7 @@ static bool generic_tiff_open(openslide_t *osr,
+   } while (TIFFReadDirectory(ct.tiff));
+ 
+   // sort tiled levels
+-  g_ptr_array_sort(level_array, width_compare);
++  g_ptr_array_sort(level_array, (GCompareFunc) width_compare_with_data);
+ 
+   // set hash and properties
+   struct level *top_level = level_array->pdata[level_array->len - 1];
+diff --git a/src/openslide-vendor-hamamatsu.c b/src/openslide-vendor-hamamatsu.c
+index 6c0ae32..ddfe2b0 100644
+--- a/src/openslide-vendor-hamamatsu.c
++++ b/src/openslide-vendor-hamamatsu.c
+@@ -855,6 +855,10 @@ static gint width_compare(gconstpointer a, gconstpointer b) {
+   return (w1 < w2) - (w1 > w2);
+ }
+ 
++static int width_compare_with_data(gconstpointer a, gconstpointer b, gconstpointer user_data) {
++  return width_compare(a, b);
++}
++
+ #define CHK(ASSERTION)							\
+   do {									\
+     if (!(ASSERTION)) {							\
+@@ -1239,7 +1243,7 @@ static void create_scaled_jpeg_levels(openslide_t *osr,
+ 
+   // get sorted keys
+   GList *level_keys = g_hash_table_get_keys(expanded_levels);
+-  level_keys = g_list_sort(level_keys, width_compare);
++  level_keys = g_list_sort(level_keys, (GCompareFunc) width_compare_with_data);
+   //g_debug("number of keys: %d", g_list_length(level_keys));
+ 
+   // load it
+diff --git a/src/openslide-vendor-leica.c b/src/openslide-vendor-leica.c
+index faf8285..1b803c7 100644
+--- a/src/openslide-vendor-leica.c
++++ b/src/openslide-vendor-leica.c
+@@ -315,6 +315,10 @@ static int dimension_compare(const void *a, const void *b) {
+   }
+ }
+ 
++static int dimension_compare_with_data(const void *a, const void *b, const void *user_data) {
++  return dimension_compare(a, b);
++}
++
+ static void set_region_bounds_props(openslide_t *osr,
+                                     struct level *level0) {
+   int64_t x0 = INT64_MAX;
+@@ -503,7 +507,7 @@ static struct collection *parse_xml_description(const char *xml,
+     }
+ 
+     // sort dimensions
+-    g_ptr_array_sort(image->dimensions, dimension_compare);
++    g_ptr_array_sort(image->dimensions, (GCompareFunc) dimension_compare_with_data);
+   }
+ 
+   return g_steal_pointer(&collection);
+diff --git a/src/openslide-vendor-sakura.c b/src/openslide-vendor-sakura.c
+index 2ae57f2..42b5374 100644
+--- a/src/openslide-vendor-sakura.c
++++ b/src/openslide-vendor-sakura.c
+@@ -501,6 +501,10 @@ static gint compare_downsamples(const void *a, const void *b) {
+   }
+ }
+ 
++static gint compare_downsamples_with_data(const void *a, const void *b, const void *user_data) {
++  return compare_downsamples(a, b);
++}
++
+ static bool read_header(sqlite3 *db, const char *unique_table_name,
+                         int64_t *image_width, int64_t *image_height,
+                         int32_t *_tile_size, int32_t *_focal_planes,
+@@ -869,7 +873,7 @@ static bool sakura_open(openslide_t *osr, const char *filename,
+   // not autoptr; we can't fail after this
+   struct level **levels = g_new(struct level *, level_count);
+   GList *keys = g_hash_table_get_keys(level_hash);
+-  keys = g_list_sort(keys, compare_downsamples);
++  keys = g_list_sort(keys, (GCompareFunc) compare_downsamples_with_data);
+   int32_t i = 0;
+   for (GList *cur = keys; cur; cur = cur->next) {
+     levels[i] = g_hash_table_lookup(level_hash, cur->data);
+diff --git a/src/openslide-vendor-ventana.c b/src/openslide-vendor-ventana.c
+index 277090e..8e2ba08 100644
+--- a/src/openslide-vendor-ventana.c
++++ b/src/openslide-vendor-ventana.c
+@@ -373,6 +373,10 @@ static int width_compare(gconstpointer a, gconstpointer b) {
+   }
+ }
+ 
++static int width_compare_with_data(gconstpointer a, gconstpointer b, gconstpointer user_data) {
++  return width_compare(a, b);
++}
++
+ static bool parse_initial_xml(openslide_t *osr, const char *xml,
+                               GError **err) {
+   // parse
+@@ -916,7 +920,7 @@ static bool ventana_open(openslide_t *osr, const char *filename,
+   } while (TIFFReadDirectory(ct.tiff));
+ 
+   // sort tiled levels
+-  g_ptr_array_sort(level_array, width_compare);
++  g_ptr_array_sort(level_array, (GCompareFunc) width_compare_with_data);
+ 
+   // get level 0
+   if (level_array->len == 0) {
+diff --git a/src/openslide-vendor-zeiss.c b/src/openslide-vendor-zeiss.c
+index 0f3f70d..a76ebb6 100644
+--- a/src/openslide-vendor-zeiss.c
++++ b/src/openslide-vendor-zeiss.c
+@@ -1182,6 +1182,10 @@ static int compare_level_downsamples(const void *a, const void *b) {
+   return (la->downsample_i < lb->downsample_i) ? -1 : 1;
+ }
+ 
++static int compare_level_downsamples_with_data(const void *a, const void *b, const void *user_data) {
++  return compare_level_downsamples(a, b);
++}
++
+ static GPtrArray *create_levels(openslide_t *osr, struct czi *czi,
+                                 int64_t max_downsample,
+                                 uint64_t *default_cache_size_OUT,
+@@ -1219,7 +1223,7 @@ static GPtrArray *create_levels(openslide_t *osr, struct czi *czi,
+                 "Found no levels in slide");
+     return NULL;
+   }
+-  g_ptr_array_sort(levels, compare_level_downsamples);
++  g_ptr_array_sort(levels, (GCompareFunc) compare_level_downsamples_with_data);
+ 
+   // now that we know bucket sizes, create grids.  also collect max tile size
+   uint32_t max_tile_w = 0;

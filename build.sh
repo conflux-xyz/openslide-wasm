@@ -2,6 +2,8 @@
 
 set -e
 
+DEBUG_MODE="off"
+
 if [ -z "$EMSCRIPTEN_PATH" ]; then
   export EMSCRIPTEN_PATH=/emsdk/emsdk_env.sh
 fi
@@ -23,8 +25,16 @@ export CHOST="wasm32-unknown-linux"
 export ax_cv_c_float_words_bigendian=no
 export MESON_CROSS=${SOURCE_HOME}/emscripten-crossfile.meson
 
-export DEFAULT_CFLAGS="-O3 -msimd128 -s USE_PTHREADS=1 -pthread"
-export DEFAULT_LDFLAGS="-O3 -lpthread"
+# If in DEBUG_MODE, set the following flags
+if [ "$DEBUG_MODE" = "on" ]; then
+    DEFAULT_CFLAGS="-O0 -g -gsource-map=inline"
+    DEFAULT_LDFLAGS="-O0 -g -gsource-map=inline"
+else
+    DEFAULT_CFLAGS="-O3 -msimd128"
+    DEFAULT_LDFLAGS="-O3"
+fi
+export DEFAULT_CFLAGS="${DEFAULT_CFLAGS} -s USE_PTHREADS=1 -pthread"
+export DEFAULT_LDFLAGS="${DEFAULT_LDFLAGS} -lpthread"
 
 cd ${DEPS_DIRECTORY}
 
@@ -288,10 +298,15 @@ cd ${DEPS_DIRECTORY}
 # - `-s ASYNCIFY=1` appears to be necessary for FS.createLazyFile to work.
 # - For development builds, consider removing -Os to speed up builds (~4x speedup).
 #   Also consider adding `-g` to add DWARF debug information.
-    # -O3 \
-    # -msimd128 \
+
+if [ "$DEBUG_MODE" = "on" ]; then
+    optimization_flags="-O0 -g -gsource-map=inline"
+else
+    optimization_flags="-O3 -flto -msimd128"
+fi
+
 (emcc -lworkerfs.js -s WASM=1 \
-    -O3 -flto -msimd128 \
+    ${optimization_flags} \
     -s MODULARIZE=1 -s EXPORT_NAME="createModule" -s EXPORT_ES6=1 \
     -s ENVIRONMENT=web,worker \
     -s WASM_BIGINT -s ASYNCIFY_STACK_SIZE=65536 -s ASYNCIFY=1 -s ALLOW_MEMORY_GROWTH \

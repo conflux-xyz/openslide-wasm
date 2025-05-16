@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/openslide.js",
   "scripts": {
-    "build": "yarn tsc -b . && npx esbuild src/openslide.ts --bundle --platform=browser --outfile=dist/openslide.js  --format=esm && cp src/lib.wasm dist/lib.wasm",
+    "build": "bash build-dist.sh",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest)"
   },
   "types": "dist/openslide.d.ts",
