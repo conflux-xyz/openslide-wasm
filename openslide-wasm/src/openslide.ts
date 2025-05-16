@@ -67,9 +67,8 @@ export default class OpenSlide {
    * @returns {OpenSlide} An instance of OpenSlide.
    * @throws {Error} If the number of workers is less than 1.
    */
-  constructor({
-    workers = 1,
-  }: OpenSlideOptions) {
+  constructor(options?: OpenSlideOptions) {
+    const workers = options?.workers || 1;
     if (workers < 1) {
       throw new Error("Number of workers must be at least 1");
     }
