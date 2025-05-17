@@ -2,7 +2,7 @@
 
 set -e
 
-rm -r dist
+rm -rf dist
 yarn tsc -b .
 npx esbuild src/openslide.ts \
     --bundle \
