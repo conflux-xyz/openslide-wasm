@@ -20,7 +20,7 @@ You can then import `OpenSlide` and use it as follows:
 ```typescript
 import OpenSlide from "@conflux-xyz/openslide-wasm";
 
-async function drawSlide(slideFile: File, mpp: float) {
+async function drawSlide(slideFile: File, mpp: number) {
    const openSlide = new OpenSlide({workers: 1});
    await openSlide.initialize();
    const slide = openSlide.open(slideFile);
