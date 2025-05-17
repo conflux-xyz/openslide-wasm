@@ -51,7 +51,7 @@ async function drawSlide(slideFile: File, mpp: number) {
    const ctx2d = canvas.getContext("2d");
    canvas.style.border = "1px solid black";
    canvas.width = targetWidth;
-   canvas.height = regionHeight;
+   canvas.height = targetHeight;
    ctx2d.drawImage(bitmap, 0, 0);
 };
 ```
