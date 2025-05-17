@@ -23,7 +23,7 @@ import OpenSlide from "@conflux-xyz/openslide-wasm";
 async function drawSlide(slideFile: File, mpp: number) {
    const openSlide = new OpenSlide({workers: 1});
    await openSlide.initialize();
-   const slide = openSlide.open(slideFile);
+   const slide = await openSlide.open(slideFile);
    const slideMppStr = await slide.getPropertyValue("openslide.mpp-x");
    if (!slideMppStr) {
       console.error("No MPP property found");
