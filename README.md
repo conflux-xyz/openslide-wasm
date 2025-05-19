@@ -6,82 +6,106 @@ The project compiles [OpenSlide](https://openslide.org/), along with its depende
 
 ## Getting Started
 
-#### With script files
-To use the library you just need to add `openslide.js` directory to your web project.  The dist folder has an example `index.html` to reference.
+### Installation
 
-```javascript
-<script language="javascript" type="module">
-  import OpenSlide from "./openslide.js";
-  async function run() {
-   const ctx = new OpenSlide({workers: 1});
-   await ctx.initialize();
-   const image = await ctx.open("sample.svs");
-   const numLevels = await image.getLevelCount();
-   const dims = await image.getLevelDimensions(0);
-   const canvas = document.getElementById("image");
-   image.drawToCanvas(canvas, 0, 0, 0, 512, 512);
-  }
-  document.addEventListener("DOMContentLoaded", () => {
-    run();
-  });
-</script>
+Install via [NPM](https://www.npmjs.com/) or [Yarn](https://classic.yarnpkg.com/en/):
+
+```shell
+yarn add @conflux-xyz/openslide-wasm
+npm install @conflux-xyz/openslide-wasm
 ```
 
-You can also install via [Yarn](https://classic.yarnpkg.com/en/) or [NPM](https://www.npmjs.com/)
-- `yarn add @conflux-xyz/openslide-wasm`
-- `npm install @conflux-xyz/openslide-wasm`
+You can then import `OpenSlide` and use it as follows:
 
-See more details on using NPM or Yarn [here](https://github.com/conflux-xyz/openslide-wasm/blob/main/openslide-wasm/README.md).
+```typescript
+import OpenSlide from "@conflux-xyz/openslide-wasm";
 
-## Limitations
+async function drawSlide(slideFile: File, mpp: number) {
+   const openSlide = new OpenSlide({workers: 1});
+   await openSlide.initialize();
+   const slide = await openSlide.open(slideFile);
+   const slideMppStr = await slide.getPropertyValue("openslide.mpp-x");
+   if (!slideMppStr) {
+      console.error("No MPP property found");
+      await slide.close();
+      return;
+   }
+   const slideMpp = parseFloat(slideMppStr);
+   const downsample = mpp / slideMpp;
+   const [width, height] = await slide.getLevelDimensions(0);
+   const targetWidth = Math.round(width / downsample);
+   const targetHeight = Math.round(height / downsample);
+   const bestLevel = await slide.getBestLevelForDownsample(downsample);
+   const [levelWidth, levelHeight] = await slide.getLevelDimensions(bestLevel);
 
-- OpenSlideWASM uses `SharedArrayBuffer`. This [article](https://blog.logrocket.com/understanding-sharedarraybuffer-and-cross-origin-isolation/) provides some helpful context.
-- Currently only SVS format is supported.
+   const region = await slide.readRegion(0, 0, bestLevel, levelWidth, levelHeight, true);
+   const imageData = new ImageData(region, levelWidth, levelHeight);
 
-## Build using Docker
+   // Resize the image tile data to the desired width and height
+   const bitmap = await createImageBitmap(imageData, {
+      resizeWidth: targetWidth,
+      resizeHeight: targetHeight,
+   });
 
-To build the project follow these steps:
+   const canvas = document.getElementById("image");
+   const ctx2d = canvas.getContext("2d");
+   canvas.style.border = "1px solid black";
+   canvas.width = targetWidth;
+   canvas.height = targetHeight;
+   ctx2d.drawImage(bitmap, 0, 0);
+};
+```
 
-1. Load dependencies by running the `get_external_deps.sh` script.
+## Examples
 
-2. Build the Docker build environment. We have included all the build tools necessary (e.g Emscripten, Meson) in this container: `docker build -t wasm-build .`
+Check out the [examples/](./examples/) directory for a good example of reading a WSI from a File or URL.
 
-3. Build in the docker container: `docker run -v .:/src wasm-build ./build.sh`
+You can run it yourself by:
+```shell
+cd openslide-wasm
+yarn
+yarn build
+cd ../
+python examples/server.py
+```
+and visit [http://localhost:8080/examples/canvas](http://localhost:8080/examples/canvas).
 
-NOTE: The initial build can take 20-30 minutes to complete. Once the dependencies are compiled re-running the build script should be much faster.
+## Important Notes
 
-4. In the `openslide-wasm` directory: `yarn install; yarn build`
+### SharedArrayBuffer
 
-## Build locally
+OpenSlideWASM uses `SharedArrayBuffer`. This [article](https://blog.logrocket.com/understanding-sharedarraybuffer-and-cross-origin-isolation/) provides some helpful context.
 
-1. Install the build tools below:
+Because of this, when you serve the web pages that use `OpenSlideWASM`, you will need to send the following headers with each request:
+```
+Cross-Origin-Embedder-Policy: require-corp
+Cross-Origin-Opener-Policy: same-origin
+```
 
-   - emscripten
-   - Python 3.9 (python3 python3-pip python3-setuptools python3-wheel)
-   - Meson
-   - autoconf
-   - automake
-   - libtool
-   - libglib2.0-dev-bin
-   - pkg-config
-   - ninja-build
+### CORS
 
-2. Edit `emscripten-crossfile.meson` to point to your python path under the `[binaries]` section:
+When fetching files from a remote server into the browser, you will need to ensure CORS headers are appropriately set on the files that you are fetching.
 
-   ```
-   [binaries]
-   python = '/usr/bin/python3.9'
-   ...
-   ```
+For a fairly permissive example:
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, HEAD
+Access-Control-Allow-Headers: *
+```
 
-3. Load dependencies by running the `get_external_deps.sh` script.
+### Range Requests
 
-4. Run the build command:
-   ```
-   EMSCRIPTEN_PATH=<your emscripten install directory> SOURCE_HOME=$(pwd) ./build.sh
-   ```
+If you want to reference a remote WSI but do not want to download it locally, `OpenSlideWASM` supports reading via byte range requests.
 
-5. In the `openslide-wasm` directory: `yarn install; yarn build`
+For this to work:
+1. The server serving the WSIs must support byte range requests.
+2. If the server is running behind a different domain, in addition the CORS headers listed above, the server will also need to provide the following response header:
+```
+Access-Control-Expose-Headers: Accept-Ranges, Content-Encoding, Content-Length
+```
 
-## Tests
-A basic set of unit tests is included in the `openslide-wasm/tests/` directory. They can be run via `yarn test`
+### File Formats
+
+At this point most, but not all, WSI file formats supported by the OpenSlide C library are also supported by OpenSlideWASM. We will strive to support all the same formats that OpenSlide C supports.
+
+If you find a format that does not work, please file an issue, and, even better, submit a pull request!
