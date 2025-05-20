@@ -290,12 +290,11 @@ class OpenSlideImage {
    * @param level - The level of the image to read from.
    * @param width - The width of the region to read.
    * @param height - The height of the region to read.
-   * @param readRgba - Whether to read the region as RGBA (default: false).
-   * @returns A promise that resolves to a Uint8ClampedArray containing the pixel data.
+   * @returns A promise that resolves to a Uint8ClampedArray containing the pixel data in RGBA format.
    */
-  async readRegion(x: number, y: number, level: number, width: number, height: number, readRgba: boolean = false): Promise<Uint8ClampedArray> {
+  async readRegion(x: number, y: number, level: number, width: number, height: number): Promise<Uint8ClampedArray> {
     const { osr, worker } = this.getHandle();
-    const response = await worker.sendCommand({ type: "readRegion", payload: { osr, x, y, level, width, height, readRgba } });
+    const response = await worker.sendCommand({ type: "readRegion", payload: { osr, x, y, level, width, height } });
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }

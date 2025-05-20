@@ -10,7 +10,7 @@ export type WorkerCommandBase =
   | {type: "getLevelDimensions", payload: {osr: OpenSlideT, level: number}}
   | {type: "getLevelDownsample", payload: {osr: OpenSlideT, level: number}}
   | {type: "getBestLevelForDownsample", payload: {osr: OpenSlideT, downsample: number}}
-  | {type: "readRegion", payload: {osr: OpenSlideT, x: number, y: number, level: number, width: number, height: number, readRgba?: boolean}}
+  | {type: "readRegion", payload: {osr: OpenSlideT, x: number, y: number, level: number, width: number, height: number}}
 export type WorkerCommand = WorkerCommandBase & {id: string};
 
 export type WorkerResponseBase =

@@ -38,7 +38,7 @@ async function drawSlide(slideFile: File, mpp: number) {
    const bestLevel = await slide.getBestLevelForDownsample(downsample);
    const [levelWidth, levelHeight] = await slide.getLevelDimensions(bestLevel);
 
-   const region = await slide.readRegion(0, 0, bestLevel, levelWidth, levelHeight, true);
+   const region = await slide.readRegion(0, 0, bestLevel, levelWidth, levelHeight);
    const imageData = new ImageData(region, levelWidth, levelHeight);
 
    // Resize the image tile data to the desired width and height
