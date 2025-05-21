@@ -22,6 +22,7 @@
       const remoteUrlInput = document.getElementById("remoteUrl");
       const loadRemoteButton = document.getElementById("loadRemote");
       const clearButton = document.getElementById("clear");
+      const abortButton = document.getElementById("abort");
       const canvasContainer = document.getElementById("canvas-container");
 
       const handleSlide = async (slide) => {
@@ -62,36 +63,74 @@
         const regionTargetHeight = Math.floor(targetHeight / numPartitions);
 
         const regionPromises = [];
+        const regionControllers = [];
         for (let j = 0; j < numPartitions; j++) {
           for (let i = 0; i < numPartitions; i++) {
             const x = i * regionWidth;
             const y = j * regionHeight;
-            regionPromises.push(
-              slide.readRegion(x, y, bestLevel, regionLevelWidth, regionLevelHeight)
-            );
+            const regionController = new AbortController();
+            regionControllers.push(regionController);
+            const opts = {
+              signal: regionController.signal,
+            };
+            const fn = async () => {
+              try {
+                const region = await slide.readRegion(x, y, bestLevel, regionLevelWidth, regionLevelHeight, opts);
+                return region;
+              } catch (err) {
+                console.error("Error reading region", err);
+                return null;
+              }
+            }
+            regionPromises.push(fn());
           }
         }
+        abortButton.onclick = () => {
+          regionControllers.forEach((controller) => {
+            console.log('aborting');
+            controller.abort("Abort button clicked");
+          });
+        };
         console.time('readRegion');
         const allRegions = await Promise.all(regionPromises);
         console.timeEnd('readRegion');
-        allRegions.forEach(async (region, index) => {
-          const imageData = new ImageData(region, regionLevelWidth, regionLevelHeight);
-
-          // Resize the image tile data to the desired width and height
-          const bitmap = await createImageBitmap(imageData, {
-            resizeWidth: regionTargetWidth,
-            resizeHeight: regionTargetHeight,
-          });
-
+        for (const region of allRegions) {
           const canvas = document.createElement("canvas");
           const ctx2d = canvas.getContext("2d");
           canvas.style.border = "1px solid black";
           canvas.width = regionTargetWidth;
           canvas.height = regionTargetHeight;
-          ctx2d.drawImage(bitmap, 0, 0);
 
+          if (region) {
+            const imageData = new ImageData(region, regionLevelWidth, regionLevelHeight);
+
+            // Resize the image tile data to the desired width and height
+            const bitmap = await createImageBitmap(imageData, {
+              resizeWidth: regionTargetWidth,
+              resizeHeight: regionTargetHeight,
+            });
+
+            ctx2d.drawImage(bitmap, 0, 0);
+          } else {
+            // Draw a transparent black box when no image data is available
+            ctx2d.fillStyle = "rgba(0, 0, 0, 0.8)";
+            ctx2d.fillRect(0, 0, regionTargetWidth, regionTargetHeight);
+
+            // Add warning symbol (exclamation mark)
+            ctx2d.fillStyle = "yellow";
+            ctx2d.beginPath();
+            ctx2d.arc(regionTargetWidth / 2, regionTargetHeight / 2 - 15, 15, 0, Math.PI * 2);
+            ctx2d.fill();
+
+            // Draw exclamation mark
+            ctx2d.fillStyle = "black";
+            ctx2d.font = "bold 20px Arial";
+            ctx2d.textAlign = "center";
+            ctx2d.textBaseline = "middle";
+            ctx2d.fillText("!", regionTargetWidth / 2, regionTargetHeight / 2 - 15);
+          }
           canvasContainer.appendChild(canvas);
-        });
+        };
       }
 
       // On file input change, load the file and display it
@@ -135,6 +174,7 @@
     </div>
     <div>
       <button id="clear">Clear</button>
+      <button id="abort">Abort</button>
     </div>
     <div id="canvas-container" style="display: inline-grid; grid-template-columns: repeat(2, auto);">
     </div>

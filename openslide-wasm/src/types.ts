@@ -11,6 +11,7 @@ export type WorkerCommandBase =
   | {type: "getLevelDownsample", payload: {osr: OpenSlideT, level: number}}
   | {type: "getBestLevelForDownsample", payload: {osr: OpenSlideT, downsample: number}}
   | {type: "readRegion", payload: {osr: OpenSlideT, x: number, y: number, level: number, width: number, height: number}}
+  | {type: "abort"}
 export type WorkerCommand = WorkerCommandBase & {id: string};
 
 export type WorkerResponseBase =
