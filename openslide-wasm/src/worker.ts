@@ -105,7 +105,7 @@ class OpenSlideApi {
     return level;
   }
 
-  async readRegion(osr: OpenSlideT, x: number, y: number, level: number, width: number, height: number, readRgba: boolean = false) {
+  async readRegion(osr: OpenSlideT, x: number, y: number, level: number, width: number, height: number) {
     // We malloc memory to pack all values into a single chunk of memory
     const args = this.lib._malloc(40);
     this.lib.HEAP64[args / 8] = BigInt(x); // int64_t x (8 bytes)
@@ -114,7 +114,7 @@ class OpenSlideApi {
     this.lib.HEAP32[args / 4 + 5] = 0; // Padding (4 bytes, required for alignment)
     this.lib.HEAP64[args / 8 + 3] = BigInt(width); // int64_t w (8 bytes)
     this.lib.HEAP64[args / 8 + 4] = BigInt(height); // int64_t h (8 bytes)
-    this.lib.HEAP32[args / 4 + 10] = readRgba ? 1 : 0; // int32_t read_rgba (4 bytes)
+    this.lib.HEAP32[args / 4 + 10] = 1; // int32_t read_rgba always 1 (4 bytes)
 
     const data = await this._readRegionAsync(osr, args);
     this.lib._free(args);
@@ -279,8 +279,8 @@ async function handleMessage(
       break;
     }
     case "readRegion": {
-      const {osr, x, y, level, width, height, readRgba} = data.payload;
-      const regionData = await api.readRegion(osr, x, y, level, width, height, readRgba);
+      const {osr, x, y, level, width, height} = data.payload;
+      const regionData = await api.readRegion(osr, x, y, level, width, height);
       doPostMessage(id, {type: "readRegion", payload: {data: regionData}});
       break;
     }
