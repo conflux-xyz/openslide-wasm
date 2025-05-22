@@ -33,6 +33,46 @@ function randomString(length: number = 10) {
 }
 
 
+interface QueueJob {
+  id: string;
+  fn: () => Promise<void>;
+}
+class Queue {
+  private _queue: QueueJob[] = [];
+  private _runningCount = 0;
+
+  constructor(private _concurrency = 1) {}
+
+  async run() {
+    // Start as many tasks as we can, up to concurrency limit
+    while (this._runningCount < this._concurrency && this._queue.length > 0) {
+      const job = this._queue.shift();
+      if (job) {
+        this._runningCount++;
+        // Execute the task and decrement counter when done
+        // Use finally to ensure counter decrements even if task fails
+        job.fn().finally(() => {
+          this._runningCount--;
+          // Try to run more tasks when this one completes
+          this.run();
+        });
+      }
+    }
+  }
+
+  add(job: QueueJob) {
+    this._queue.push(job);
+    this.run();
+  }
+
+  abort(id: string) {
+    this._queue = this._queue.filter(job => job.id !== id);
+  }
+}
+
+const _READ_REGION_CONCURRENCY = 4;
+const _READ_REGION_QUEUE = new Queue(_READ_REGION_CONCURRENCY);
+
 class OpenSlideApi {
   private _getPropertyNamesAsync: (osr: OpenSlideT) => Promise<Pointer>;
   private _getPropertyValueAsync: (osr: OpenSlideT, name: string) => Promise<Pointer>;
@@ -189,7 +229,6 @@ class OpenSlideApi {
 let api: OpenSlideApi | undefined = undefined;
 
 
-
 function doPostMessage(id: string, message: WorkerResponseBase) {
   self.postMessage({id, ...message});
 }
@@ -280,13 +319,33 @@ async function handleMessage(
     }
     case "readRegion": {
       const {osr, x, y, level, width, height} = data.payload;
-      const regionData = await api.readRegion(osr, x, y, level, width, height);
-      doPostMessage(id, {type: "readRegion", payload: {data: regionData}});
+      _READ_REGION_QUEUE.add({
+        id,
+        fn: async () => {
+          // If we don't add some minor wait here, we don't give the worker
+          // a chance to process other messages. This is especially important
+          // for the abort messages, which might include an abort of this readRegion
+          // call.
+          // Even though `api.readRegion` is async, it doesn't seem to yield
+          // the event loop.
+          await timeout(0);
+          const regionData = await api.readRegion(osr, x, y, level, width, height);
+          doPostMessage(id, {type: "readRegion", payload: {data: regionData}});
+        },
+      });
+      break;
+    }
+    case "abort": {
+      _READ_REGION_QUEUE.abort(id);
       break;
     }
     default:
       exhaustiveCheck(dataType);
   }
+}
+
+function timeout(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function exhaustiveCheck(x: never): never {

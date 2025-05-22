@@ -3,6 +3,8 @@ import { WorkerCommandBase, WorkerResponse, OpenSlideT } from "./types";
 type PromiseFns = {
   resolve: (value: WorkerResponse) => void;
   reject: (reason: Error) => void;
+  signal?: AbortSignal;
+  abortHandler?: (event: Event) => void;
 }
 
 function randomString(length: number = 10) {
@@ -11,6 +13,14 @@ function randomString(length: number = 10) {
     randomName += String.fromCharCode(Math.floor(Math.random() * 26) + 97);
   }
   return randomName;
+}
+
+
+export interface ReadRegionOptions {
+  signal?: AbortSignal;
+}
+interface CommandOptions {
+  signal?: AbortSignal;
 }
 
 class OpenSlideWorker {
@@ -29,6 +39,10 @@ class OpenSlideWorker {
         return;
       }
       this.promiseFns.delete(id);
+      const { signal, abortHandler } = promiseFn;
+      if (signal && abortHandler) {
+        signal.removeEventListener("abort", abortHandler);
+      }
       const { resolve, reject } = promiseFn;
       if (data.type === "error") {
         reject(new Error(data.payload.message));
@@ -43,14 +57,25 @@ class OpenSlideWorker {
     return this.promiseFns.size;
   }
 
-  sendCommand(command: WorkerCommandBase): Promise<WorkerResponse> {
+  sendCommand(command: WorkerCommandBase, opts?: CommandOptions): Promise<WorkerResponse> {
     const id = randomString(16);
+    const signal = opts?.signal;
     return new Promise<WorkerResponse>((resolve, reject) => {
       this.worker.postMessage({ ...command, id });
-      this.promiseFns.set(id, { resolve, reject });
+      const abortHandler = signal === undefined ? undefined : (event: Event) => {
+        this.promiseFns.delete(id);
+        this.worker.postMessage({ type: "abort", id });
+        signal.removeEventListener("abort", abortHandler!);
+        // TODO: Upgrade TypeScript to >5 and see if this fixes the issue here.
+        const reason = (signal as any as { reason: string }).reason;
+        reject(createAbortError(reason));
+      };
+      if (signal && abortHandler) {
+        signal.addEventListener("abort", abortHandler);
+      }
+      this.promiseFns.set(id, { resolve, reject, signal, abortHandler });
     });
   }
-
 }
 
 export interface OpenSlideOptions {
@@ -136,15 +161,27 @@ function ensureFileOrUrl(file: File | URL | string): File | URL {
 
 async function fetchFileFromUrl(url: URL) {
   const filename = url.pathname.split("/").pop() || "filename";
-  console.log("Fetching file from URL:", url.toString());
   const response = await fetch(url.toString());
-  console.log("Response status:", response.status);
   const blob = await response.blob();
-  console.log("Blob size:", blob.size);
   const file = new File([blob], filename, { type: blob.type });
   return file;
 }
 
+class AbortError extends Error {
+  constructor(message = "Aborted") {
+    super(message);
+    this.name = "AbortError";
+  }
+}
+
+function createAbortError(reason: string = "Aborted") {
+  if (typeof DOMException === "function") {
+    return new DOMException(reason, "AbortError");
+  }
+
+  // Custom fallback for environments without DOMException
+  return new AbortError(reason);
+}
 
 interface OpenSlideHandle {
   osr: OpenSlideT;
@@ -292,9 +329,9 @@ class OpenSlideImage {
    * @param height - The height of the region to read.
    * @returns A promise that resolves to a Uint8ClampedArray containing the pixel data in RGBA format.
    */
-  async readRegion(x: number, y: number, level: number, width: number, height: number): Promise<Uint8ClampedArray> {
+  async readRegion(x: number, y: number, level: number, width: number, height: number, options?: ReadRegionOptions): Promise<Uint8ClampedArray> {
     const { osr, worker } = this.getHandle();
-    const response = await worker.sendCommand({ type: "readRegion", payload: { osr, x, y, level, width, height } });
+    const response = await worker.sendCommand({ type: "readRegion", payload: { osr, x, y, level, width, height } }, options);
     if (response.type === "error") {
       throw new Error(response.payload.message);
     }
