@@ -67,7 +67,7 @@ class OpenSlideWorker {
         this.worker.postMessage({ type: "abort", id });
         signal.removeEventListener("abort", abortHandler!);
         // TODO: Upgrade TypeScript to >5 and see if this fixes the issue here.
-        const reason = (signal as any).reason as string;
+        const reason = (signal as any as { reason: string }).reason;
         reject(createAbortError(reason));
       };
       if (signal && abortHandler) {
