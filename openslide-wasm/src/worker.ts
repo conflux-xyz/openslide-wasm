@@ -180,6 +180,11 @@ class OpenSlideApi {
     const {filename, mountDir} = await this._open_file(fileOrUrl);
     const filepath = mountDir ? `${mountDir}/${filename}` : filename;
     const osr = await this._openSlideAsync(filepath);
+    if (osr === 0) {
+      // Eventually we should hook into `openslide_get_error` to get any relevant
+      // error message. This would apply to all calls to the openslide C code.
+      throw new Error("Failed to open slide");
+    }
     if (mountDir) {
       this._osrMountMap.set(osr, mountDir);
     }
