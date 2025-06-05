@@ -340,6 +340,23 @@ class OpenSlideImage {
     }
     return response.payload.data;
   }
+
+  /**
+   * Read the ICC color profile embedded in the image.
+   * @returns A promise that resolves to an ArrayBuffer containing the ICC profile data, or null if no profile is available.
+   */
+  async readIccProfile(): Promise<Uint8Array | null> {
+    const { osr, worker } = this.getHandle();
+    const response = await worker.sendCommand({ type: "readIccProfile", payload: { osr } });
+    if (response.type === "error") {
+      throw new Error(response.payload.message);
+    }
+    if (response.type !== "readIccProfile") {
+      throw new Error("Unexpected response type");
+    }
+    return response.payload.iccProfile;
+  }
+
 }
 
 export type { OpenSlideImage };
