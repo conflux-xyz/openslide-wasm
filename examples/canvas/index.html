@@ -139,8 +139,13 @@
         const file = e.target.files[0];
         if (!file) return;
         console.log('file', file);
-        const slide = await window.openslide.open(file);
-        await handleSlide(slide);
+        try {
+          const slide = await window.openslide.open(file);
+          await handleSlide(slide);
+        } catch (e) {
+          console.error("Error handling slide!", e);
+          return;
+        }
       });
 
       loadRemoteButton.onclick = async () => {
@@ -149,8 +154,13 @@
         if (!url) return;
         console.log('url', url);
         const downloadRemote = downloadRemoteCheckbox.checked;
-        const slide = await window.openslide.open(url, downloadRemote);
-        await handleSlide(slide);
+        try {
+          const slide = await window.openslide.open(url, downloadRemote);
+          await handleSlide(slide);
+        } catch (e) {
+          console.error("Error handling slide!", e);
+          return;
+        }
       };
     </script>
   </head>
