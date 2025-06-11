@@ -1,6 +1,6 @@
 {
   "name": "@conflux-xyz/openslide-wasm",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "license": "MIT",
   "type": "module",
   "main": "dist/openslide.js",
