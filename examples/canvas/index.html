@@ -3,12 +3,17 @@
     <title>Openslide Test</title>
     <script language="javascript" type="module">
       import OpenSlide from "/openslide-wasm/dist/openslide.js";
+      import { instantiate, INTENT_PERCEPTUAL, TYPE_RGB_8, TYPE_RGBA_8 } from "/examples/canvas/lcms/lcms.js";
 
       async function initialize() {
         window.openslide = new OpenSlide({workers: 4});
         console.log('created');
         await openslide.initialize();
         console.log('initialized');
+        window.lcms = await instantiate({
+          locateFile: (file) => "/examples/canvas/lcms/lcms.wasm",
+        });
+        console.log('window.lcms?', window.lcms);
       }
 
       document.addEventListener("DOMContentLoaded", () => {
@@ -16,6 +21,7 @@
       });
 
       const downloadRemoteCheckbox = document.getElementById("downloadRemote");
+      const applyIccProfileCheckbox = document.getElementById("applyIccProfile");
       const mppInput = document.getElementById("mpp");
       const numPartitionsInput = document.getElementById("num-partitions");
       const fileInput = document.getElementById("file");
@@ -24,6 +30,102 @@
       const clearButton = document.getElementById("clear");
       const abortButton = document.getElementById("abort");
       const canvasContainer = document.getElementById("canvas-container");
+
+      // iccProfile is Uint8Array or null
+      const getIccTransform = (iccProfile) => {
+        if (!iccProfile) {
+          console.warn("No ICC profile provided, returning null transform");
+          return null;
+        }
+        const flags = (
+          lcms.cmsFLAGS_NOCACHE |
+          lcms.cmsFLAGS_HIGHRESPRECALC |
+          lcms.cmsFLAGS_NOOPTIMIZE |
+          lcms.cmsFLAGS_BLACKPOINTCOMPENSATION
+        );
+
+        const inputProfile = lcms.cmsOpenProfileFromMem(iccProfile, iccProfile.length);
+        const inputProfileName = lcms.cmsGetProfileInfoASCII(
+          inputProfile,
+          lcms.cmsInfoDescription,
+          "en",
+          "US"
+        );
+        console.log('input profile name', inputProfileName);
+
+        const outputProfile = lcms.cmsCreate_sRGBProfile();
+        const outputProfileName = lcms.cmsGetProfileInfoASCII(
+          outputProfile,
+          lcms.cmsInfoDescription,
+          "en",
+          "US"
+        );
+        console.log('output profile name', outputProfileName);
+        const transform = lcms.cmsCreateTransform(
+          inputProfile,
+          TYPE_RGBA_8,
+          outputProfile,
+          TYPE_RGBA_8,
+          INTENT_PERCEPTUAL,
+          flags,
+        );
+        if (transform === 0) {
+          console.error("Failed to create transform", lcms.cmsGetLastErrorMessage());
+          return null;
+        }
+        console.log('Transform created', transform);
+        lcms.cmsCloseProfile(inputProfile);
+        lcms.cmsCloseProfile(outputProfile);
+        return transform;
+      }
+
+      // Convert RGBA to RGB with Alpha = 255
+      // Ref: https://openslide.org/docs/premultiplied-argb/
+      const applyAlphaInPlace = (imageData) => {
+
+        // Function to convert RGBA data to RGB data
+        if (!imageData || imageData.length === 0) {
+          console.warn("Empty image data provided to convertToRgb");
+          return null;
+        }
+
+        for (let i = 0; i < imageData.length; i += 4) {
+          const a = imageData[i + 3]; // Alpha channel
+          if (a === 0) {
+            // white (or could use openslide.background-color if available)
+            imageData[i] = imageData[i + 1] = imageData[i + 2] = 255;
+            imageData[i + 3] = 255; // Set alpha to 255
+          } else if (a === 255) {
+            // fully opaque, no need to premultiply => no-op
+          } else {
+            // Premultiply RGB values by alpha
+            const alpha = a / 255; // Normalize alpha to [0, 1]
+            imageData[i] = Math.round(imageData[i] * alpha);
+            imageData[i + 1] = Math.round(imageData[i + 1] * alpha);
+            imageData[i + 2] = Math.round(imageData[i + 2] * alpha);
+            imageData[i + 3] = 255; // Set alpha to 255
+          }
+        }
+      }
+
+      const doTransform = (iccTransform, region) => {
+        if (iccTransform === null) {
+          return region;
+        }
+        applyAlphaInPlace(region);
+
+        const imageRegionData = lcms.cmsDoTransform(iccTransform, region, region.length / 4);
+        // `imageRegionData` is a Uint8Array, we need to convert it to Uint8ClampedArray
+        const clamped = new Uint8ClampedArray(imageRegionData.slice());
+
+        // For some reason, cmsDoTransform sets alpha to 0 for every pixel...
+        // Set alpha channel to 255 for every pixel
+        for (let i = 3; i < clamped.length; i += 4) {
+          clamped[i] = 255;
+        }
+
+        return clamped;
+      };
 
       const handleSlide = async (slide) => {
         clearButton.onclick = async () => {
@@ -34,6 +136,20 @@
           console.log('closed');
         };
         console.log('opened');
+        const propertyNames = await slide.getPropertyNames();
+        const propertyValues = await Promise.all(propertyNames.map(async (name) => {
+          return await slide.getPropertyValue(name);
+        }));
+        const properties = {};
+        for (let i = 0; i < propertyNames.length; i++) {
+          properties[propertyNames[i]] = propertyValues[i];
+        }
+        console.log("Properties", properties);
+
+        const iccProfile = await slide.readIccProfile();
+        const iccTransform = getIccTransform(iccProfile);
+        const applyIccProfile = applyIccProfileCheckbox.checked;
+
         const slideMppStr = await slide.getPropertyValue("openslide.mpp-x");
         if (!slideMppStr) {
           console.error("No MPP property found");
@@ -41,6 +157,8 @@
         }
         const slideMpp = parseFloat(slideMppStr);
         console.log("Slide MPP", slideMpp);
+
+        console.log("Level count", await slide.getLevelCount())
         const mpp = parseFloat(mppInput.value);
         const numPartitions = parseInt(numPartitionsInput.value);
         canvasContainer.style.gridTemplateColumns = `repeat(${numPartitions}, auto)`;
@@ -102,7 +220,9 @@
           canvas.height = regionTargetHeight;
 
           if (region) {
-            const imageData = new ImageData(region, regionLevelWidth, regionLevelHeight);
+            const imageRegionData = applyIccProfile ? doTransform(iccTransform, region) : region;
+
+            const imageData = new ImageData(imageRegionData, regionLevelWidth, regionLevelHeight);
 
             // Resize the image tile data to the desired width and height
             const bitmap = await createImageBitmap(imageData, {
@@ -131,6 +251,9 @@
           }
           canvasContainer.appendChild(canvas);
         };
+        if (iccTransform) {
+          lcms.cmsDeleteTransform(iccTransform);
+        }
       }
 
       // On file input change, load the file and display it
@@ -165,24 +288,28 @@
     </script>
   </head>
   <body>
-    <div>
+    <div style="margin: 10px 0;">
       <input type="file" id="file" name="SLIDE" />
     </div>
-    <div>
+    <div style="margin: 10px 0;">
       <input type="text" id="remoteUrl" placeholder="Remote URL" value="https://d3bzvr1k8ur14a.cloudfront.net/openslide-wasm/TCGA-LL-A7SZ-01Z-00-DX1.4DAF6421-6A1D-41C8-BFD6-859FE10CB8CC.svs" />
       <button id="loadRemote">Load Remote</button>
       <input type="checkbox" id="downloadRemote" />
       <label for="downloadRemote">Download Remote</label>
     </div>
-    <div>
+    <div style="margin: 10px 0;">
       <label for="mpp">MPP</label>
       <input type="number" id="mpp" placeholder="MPP" value="40.0" step="0.01"/>
     </div>
-    <div>
+    <div style="margin: 10px 0;">
       <label for="num-partitions">Partitions</label>
       <input type="number" id="num-partitions" placeholder="Num Partitions" value="4" step="1"/>
     </div>
-    <div>
+    <div style="margin: 10px 0;">
+      <input type="checkbox" id="applyIccProfile" />
+      <label for="applyIccProfile">Apply ICC Profile</label>
+    </div>
+    <div style="margin: 10px 0;">
       <button id="clear">Clear</button>
       <button id="abort">Abort</button>
     </div>

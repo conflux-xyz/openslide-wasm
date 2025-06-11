@@ -81,6 +81,8 @@ class OpenSlideApi {
   private _getLevelDownsampleAsync: (osr: OpenSlideT, level: number) => Promise<number>;
   private _getBestLevelForDownsampleAsync: (osr: OpenSlideT, downsample: number) => Promise<number>;
   private _readRegionAsync: (osr: OpenSlideT, args: number) => Promise<number>;
+  private _getIccProfileSizeAsync: (osr: OpenSlideT) => Promise<bigint>;
+  private _readIccProfileAsync: (osr: OpenSlideT, ptr: Pointer) => Promise<null>;
   private _openSlideAsync: (filepath: string) => Promise<OpenSlideT>;
   private _closeSlideAsync: (osr: OpenSlideT) => Promise<null>;
   private _osrMountMap: Map<OpenSlideT, string>;
@@ -93,6 +95,9 @@ class OpenSlideApi {
     this._getLevelDownsampleAsync = lib.cwrap("get_level_downsample", "number", ["number", "number"], {async: true});
     this._getBestLevelForDownsampleAsync = lib.cwrap("get_best_level_for_downsample", "number", ["number", "number"], {async: true});
     this._readRegionAsync = lib.cwrap("read_region", "number", ["number", "number"], {async: true});
+    // @ts-expect-error ts(2322) - return value is actually bigint, but `cwrap` types don't support return value.
+    this._getIccProfileSizeAsync = lib.cwrap("get_icc_profile_size", "number", ["number"], {async: true});
+    this._readIccProfileAsync = lib.cwrap("read_icc_profile", null, ["number", "number"], {async: true});
     // TODO: consider changing the names "load_image" and "close_image"
     this._openSlideAsync = lib.cwrap("load_image", "number", ["string"], {async: true});
     this._closeSlideAsync = lib.cwrap("close_image", null, ["number"], {async: true});
@@ -173,6 +178,29 @@ class OpenSlideApi {
     this.lib._free(data);
 
     return imageArray;
+  }
+
+  async readIccProfile(osr: OpenSlideT): Promise<Uint8Array | null> {
+    const bigSize = await this._getIccProfileSizeAsync(osr);
+    if (bigSize > BigInt(Number.MAX_SAFE_INTEGER) || bigSize < BigInt(Number.MIN_SAFE_INTEGER)) {
+      throw new Error("ICC profile size exceeds safe bounds for conversion to Number.");
+    }
+    const size = Number(bigSize);
+    if (size === 0) {
+      return null;
+    }
+    const profilePointer = this.lib._malloc(size);
+    await this._readIccProfileAsync(osr, profilePointer);
+
+    const profileArray = new Uint8Array(
+      this.lib.HEAPU8.buffer,
+      profilePointer,
+      size
+    );
+    // Copy the data to avoid issues when memory is freed
+    const profile = profileArray.slice();
+    this.lib._free(profilePointer);
+    return profile;
   }
 
   async open(file: File | string) {
@@ -338,6 +366,12 @@ async function handleMessage(
           doPostMessage(id, {type: "readRegion", payload: {data: regionData}});
         },
       });
+      break;
+    }
+    case "readIccProfile": {
+      const {osr} = data.payload;
+      const iccProfile = await api.readIccProfile(osr);
+      doPostMessage(id, {type: "readIccProfile", payload: {iccProfile}});
       break;
     }
     case "abort": {
