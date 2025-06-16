@@ -2,7 +2,7 @@
   <head>
     <title>Openslide Test</title>
     <script language="javascript" type="module">
-      import OpenSlide from "/openslide-wasm/dist/openslide.js";
+      import OpenSlide, { fileEntriesFromFiles, applyAlpha } from "/openslide-wasm/dist/openslide.js";
       import { instantiate, INTENT_PERCEPTUAL, TYPE_RGB_8, TYPE_RGBA_8 } from "/examples/canvas/lcms/lcms.js";
 
       async function initialize() {
@@ -81,40 +81,11 @@
         return transform;
       }
 
-      // Convert RGBA to RGB with Alpha = 255
-      // Ref: https://openslide.org/docs/premultiplied-argb/
-      const applyAlphaInPlace = (imageData) => {
-
-        // Function to convert RGBA data to RGB data
-        if (!imageData || imageData.length === 0) {
-          console.warn("Empty image data provided to convertToRgb");
-          return null;
-        }
-
-        for (let i = 0; i < imageData.length; i += 4) {
-          const a = imageData[i + 3]; // Alpha channel
-          if (a === 0) {
-            // white (or could use openslide.background-color if available)
-            imageData[i] = imageData[i + 1] = imageData[i + 2] = 255;
-            imageData[i + 3] = 255; // Set alpha to 255
-          } else if (a === 255) {
-            // fully opaque, no need to premultiply => no-op
-          } else {
-            // Premultiply RGB values by alpha
-            const alpha = a / 255; // Normalize alpha to [0, 1]
-            imageData[i] = Math.round(imageData[i] * alpha);
-            imageData[i + 1] = Math.round(imageData[i + 1] * alpha);
-            imageData[i + 2] = Math.round(imageData[i + 2] * alpha);
-            imageData[i + 3] = 255; // Set alpha to 255
-          }
-        }
-      }
-
       const doTransform = (iccTransform, region) => {
         if (iccTransform === null) {
           return region;
         }
-        applyAlphaInPlace(region);
+        applyAlpha(region);
 
         const imageRegionData = lcms.cmsDoTransform(iccTransform, region, region.length / 4);
         // `imageRegionData` is a Uint8Array, we need to convert it to Uint8ClampedArray
@@ -269,14 +240,49 @@
         }
       }
 
+      function getMiraxFileEntries(files) {
+        const miraxFile = files.find(file => file.name.toLowerCase().endsWith(".mrxs"));
+        if (!miraxFile) {
+            throw new Error("No .mrxs file found in the provided files");
+        }
+        // Create the directory structure and ensure .mrxs file is first
+        const otherFiles = files.filter(file => file !== miraxFile);
+        const miraxFileEntry = {file: miraxFile, path: miraxFile.name};
+        const dirname = miraxFile.name.slice(0, -5); // Remove the .mrxs extension for the directory name
+        const otherFileEntries = otherFiles.map(file => ({file: file, path: `${dirname}/${file.name}`}))
+        return [miraxFileEntry, ...otherFileEntries];
+      }
+
+      function getVmsFileEntries(files) {
+        const vmsFile = files.find(file => file.name.toLowerCase().endsWith(".vms"));
+        if (!vmsFile) {
+          throw new Error("No .vms file found in the provided files");
+        }
+        const otherFiles = files.filter(file => file !== vmsFile);
+        const reorderedFiles = [vmsFile, ...otherFiles];
+        return fileEntriesFromFiles(reorderedFiles);
+      }
+
+      function getFileEntries(files) {
+        const isMrxs = files.some(file => file.name.toLowerCase().endsWith(".mrxs"));
+        if (isMrxs) {
+          return getMiraxFileEntries(files);
+        }
+        const isVms = files.some(file => file.name.toLowerCase().endsWith(".vms"));
+        if (isVms) {
+          return getVmsFileEntries(files);
+        }
+        return files.map((file) => ({file, path: file.name}));
+      }
+
       // On file input change, load the file and display it
       fileInput.addEventListener("change", async (e) => {
         clearButton.onclick = null;
-        const file = e.target.files[0];
-        if (!file) return;
-        console.log('file', file);
+        const files = getFileEntries(Array.from(e.target.files));
+        if (!files) return;
+        console.log('files', files);
         try {
-          const slide = await window.openslide.open(file);
+          const slide = await window.openslide.open(files);
           await handleSlide(slide);
         } catch (e) {
           console.error("Error handling slide!", e);
@@ -302,7 +308,7 @@
   </head>
   <body>
     <div style="margin: 10px 0;">
-      <input type="file" id="file" name="SLIDE" />
+      <input type="file" id="file" name="SLIDE" multiple />
     </div>
     <div style="margin: 10px 0;">
       <input type="text" id="remoteUrl" placeholder="Remote URL" value="https://d3bzvr1k8ur14a.cloudfront.net/openslide-wasm/TCGA-LL-A7SZ-01Z-00-DX1.4DAF6421-6A1D-41C8-BFD6-859FE10CB8CC.svs" />

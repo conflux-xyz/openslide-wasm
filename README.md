@@ -104,8 +104,59 @@ For this to work:
 Access-Control-Expose-Headers: Accept-Ranges, Content-Encoding, Content-Length
 ```
 
-### File Formats
+### Multi-File Formats
 
-At this point most, but not all, WSI file formats supported by the OpenSlide C library are also supported by OpenSlideWASM. We will strive to support all the same formats that OpenSlide C supports.
+While many WSI file formats are single-file, and therefore straightforward to use in a browser context, some format are multi-file, such as [DICOM](https://openslide.org/formats/dicom/), [MIRAX](https://openslide.org/formats/mirax/), and [Hamamatsu VMS and VMU](https://openslide.org/formats/hamamatsu/).
 
-If you find a format that does not work, please file an issue, and, even better, submit a pull request!
+Support for these formats is provided by using the `File[]` or `FileEntry[]` types to `openSlide.open(...)`:
+
+```typescript
+interface FileEntry {
+   file: File;
+   path: string;
+}
+```
+
+This allows you to provide multiple files and allows you to specify the context of those files within a directory structure, if necessary.
+
+The first element of the array is the one that will be passed to OpenSlide as the file to open.
+
+Below are a few examples:
+```typescript
+// MIRAX requires a file `{NAME}.mrxs` file with a corresponding `{NAME}/` sibling directory.
+function getMiraxFileEntries(files: File[]): FileEntry[] {
+   const miraxFile = files.find(file => file.name.toLowerCase().endsWith(".mrxs"));
+   if (!miraxFile) {
+      throw new Error("No .mrxs file found in the provided files");
+   }
+   // Create the directory structure and ensure .mrxs file is first
+   const miraxFileEntry = {file: miraxFile, path: miraxFile.name};
+   const dirname = miraxFile.name.slice(0, -5); // Remove the .mrxs extension for the directory name
+   const otherFiles = files.filter(file => file !== miraxFile);
+   const otherFileEntries = otherFiles.map(file => ({file, path: `${dirname}/${file.name}`}))
+   return [miraxFileEntry, ...otherFileEntries];
+}
+
+// Hamamatsu VMS requires reading in the `.vms` file but needs all other files as well.
+function getHamamatsuVmsFiles(files: File[]): File[] {
+   const vmsFile = files.find(file => file.name.toLowerCase().endsWith(".vms"));
+   if (!vmsFile) {
+      throw new Error("No .vms file found in the provided files");
+   }
+   const otherFiles = files.filter(file => file !== vmsFile);
+   return [vmsFile, ...otherFiles];
+}
+
+// For DICOM, OpenSlide doesn't care which file is passed in, as long as all files are present
+function getDicomFiles(files: File[]): File[] {
+   // Basically a no-op
+   return files;
+}
+```
+
+
+### Other File Formats
+
+We strive to support all WSI file formats that are supported by the OpenSlide C library.
+
+If you find a format that works with the OpenSlide C library but not with OpenSlideWASM, please file an issue, and, even better, submit a pull request!

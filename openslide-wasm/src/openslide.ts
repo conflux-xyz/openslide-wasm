@@ -1,4 +1,4 @@
-import { WorkerCommandBase, WorkerResponse, OpenSlideT } from "./types";
+import { WorkerCommandBase, WorkerResponse, OpenSlideT, FileEntry } from "./types";
 
 type PromiseFns = {
   resolve: (value: WorkerResponse) => void;
@@ -113,7 +113,23 @@ export default class OpenSlide {
     return;
   }
 
-  async open(file: File | URL | string, downloadToLocal: boolean = false): Promise<OpenSlideImage> {
+  /**
+   * Open a WSI with OpenSlide.
+   * In the case of multi-file formats like DICOM, MIRAX, and Hamamatsu-VMS, use the `FileEntry[]` array
+   * where each entry contains a `File` and its corresponding path.
+   * The _first_ file in the array will be used to open the slide.
+   * 
+   * @param file A File, File array, FileEntry array, URL, or string representing the file path or URL to open.
+   * @param downloadToLocal Whether to download the file to local storage (only applicable for URLs).
+   * @returns A promise that resolves to an OpenSlideImage instance.
+   */
+  async open(file: File | File[] | FileEntry[] | URL | string, downloadToLocal: boolean = false): Promise<OpenSlideImage> {
+    if (Array.isArray(file) && file.length === 0) {
+      throw new Error("File array is empty");
+    }
+    if (isFileEntryArray(file)) {
+      validateFileEntryArray(file);
+    }
     const fileOrUrl = ensureFileOrUrl(file);
     if (fileOrUrl instanceof URL && downloadToLocal) {
       const file = await fetchFileFromUrl(fileOrUrl);
@@ -137,8 +153,47 @@ export default class OpenSlide {
   }
 }
 
-function ensureFileOrUrl(file: File | URL | string): File | URL {
-  if (file instanceof File || file instanceof URL) {
+function isFileEntryArray(file: File | File[] | FileEntry[] | URL | string): file is FileEntry[] {
+  return Array.isArray(file) && !file.some((f) => !isFileEntry(f));
+}
+
+function isFileEntry(file: File | FileEntry): file is FileEntry {
+  return (file as FileEntry).file !== undefined && (file as FileEntry).path !== undefined;
+}
+
+function validateFileEntryArray(fileEntries: FileEntry[]) {
+  for (const entry of fileEntries) {
+    if (!isValidDescendantFilePath(entry.path)) {
+      throw new Error(`Invalid file path: ${entry.path}`);
+    }
+  }
+}
+
+// Validate that the path is a relative path (not absolute),
+// doesn't try to navigate to parent directories, and uses forward slashes
+function isValidDescendantFilePath(path: string): boolean {
+  if (path === "") {
+    return false;
+  }
+  // Check if the path is absolute
+  if (path.startsWith("/") || // Unix-like absolute path
+      /^[A-Za-z]:[\\\/]/.test(path) || // Windows absolute path (e.g., C:\ or C:/)
+      path.startsWith('\\\\')) { // Windows UNC path
+    return false;
+  }
+  
+  // Check for backslashes (disallow them)
+  if (path.includes('\\')) {
+    return false;
+  }
+  
+  // Check for path traversal attempts using ..
+  const parts = path.split('/');
+  return !parts.includes('..') && !parts.includes('.');
+}
+
+function ensureFileOrUrl(file: File | File[] | FileEntry[] | URL | string): File | File[] | FileEntry[] | URL {
+  if (Array.isArray(file) || file instanceof File || file instanceof URL) {
     return file;
   }
   if (file.startsWith("http://") || file.startsWith("https://")) {
@@ -360,3 +415,60 @@ class OpenSlideImage {
 }
 
 export type { OpenSlideImage };
+export type { FileEntry };
+
+/**
+ * Convert an array of File objects to an array of FileEntry objects.
+ * 
+ * @param files An array of File objects.
+ * @returns An array of FileEntry objects, each containing the file and its path.
+ */
+export function fileEntriesFromFiles(files: File[]): FileEntry[] {
+  return files.map((file) => ({file, path: file.name}));
+}
+
+
+interface ApplyAlphaOptions {
+  backgroundColor?: [number, number, number];
+  inPlace?: boolean;
+}
+/**
+ * Apply alpha compositing to the image data, following the
+ * idiosyncrasies noted in the OpenSlide documentation.
+ * By default the operation is performed in place.
+ * Ref: https://openslide.org/docs/premultiplied-argb/
+ * 
+ * @param imageData The image data in RGBA format as a Uint8ClampedArray.
+ * @param options Options for applying alpha compositing.
+ * @param options.backgroundColor The background color to use for fully transparent pixels (default: [255, 255, 255]).
+ * @param options.inPlace Whether to modify the imageData in place (default: true).
+ */
+export function applyAlpha(
+  imageData: Uint8ClampedArray,
+  options?: ApplyAlphaOptions,
+) {
+  const backgroundColor = options?.backgroundColor || [255, 255, 255];
+  const inPlace = options?.inPlace ?? true;
+  const returnImageData = inPlace ? imageData : new Uint8ClampedArray(imageData);
+
+  for (let i = 0; i < returnImageData.length; i += 4) {
+    const a = returnImageData[i + 3];
+    if (a === 0) {
+      // white (or could use openslide.background-color if available)
+      returnImageData[i] = backgroundColor[0];
+      returnImageData[i + 1] = backgroundColor[1];
+      returnImageData[i + 2] = backgroundColor[2];
+      returnImageData[i + 3] = 255; // Set alpha to 255
+    } else if (a === 255) {
+      // fully opaque, no need to premultiply => no-op
+    } else {
+      // Premultiply RGB values by alpha
+      const alpha = a / 255; // Normalize alpha to [0, 1]
+      returnImageData[i] = Math.round(returnImageData[i] * alpha);
+      returnImageData[i + 1] = Math.round(returnImageData[i + 1] * alpha);
+      returnImageData[i + 2] = Math.round(returnImageData[i + 2] * alpha);
+      returnImageData[i + 3] = 255; // Set alpha to 255
+    }
+  }
+  return returnImageData;
+}
