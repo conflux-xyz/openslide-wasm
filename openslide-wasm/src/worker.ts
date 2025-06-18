@@ -1,5 +1,5 @@
 /// <reference types="emscripten" />
-import { WorkerCommand, WorkerResponseBase, OpenSlideT } from "./types";
+import { WorkerCommand, WorkerResponseBase, OpenSlideT, FileEntry } from "./types";
 import createModule_ from "./lib.js";
 
 const createModule: EmscriptenModuleFactory<OpenSlideEmscriptenModule> = createModule_;
@@ -203,9 +203,9 @@ class OpenSlideApi {
     return profile;
   }
 
-  async open(file: File | string) {
-    const fileOrUrl = file instanceof File ? file : new URL(file);
-    const {filename, mountDir} = await this._open_file(fileOrUrl);
+  async open(file: File | File[] | FileEntry[] | string) {
+    const fileOrUrl = (Array.isArray(file) || file instanceof File) ? file : new URL(file);
+    const {filename, mountDir} = await this._openFile(fileOrUrl);
     const filepath = mountDir ? `${mountDir}/${filename}` : filename;
     const osr = await this._openSlideAsync(filepath);
     if (osr === 0) {
@@ -219,28 +219,56 @@ class OpenSlideApi {
     return osr;
   }
 
-  async _open_file(file: File | URL) {
+  async _openFile(file: File | File[] | FileEntry[] | URL) {
     if (file instanceof URL) {
       return {
         filename: "remote",
-        mountDir: this._mount_url(file),
+        mountDir: this._mountUrl(file),
       };
     } else {
+      const files = fileEntriesFromFilesOrFileEntries(file);
       return {
-        filename: file.name,
-        mountDir: this._mount_file(file),
+        filename: files[0].path,
+        mountDir: this._mountFiles(files),
       };
     }
   }
 
-  _mount_file(file: File) {
+  _mountFiles(files: FileEntry[]) {
     const dirname = `${_TMP_PREFIX}${randomString()}`;
     this.lib.FS.mkdir(dirname);
-    this.lib.FS.mount(this.lib.WORKERFS, { files: [file] }, dirname)
+    const mountNode = this.lib.FS.mount(this.lib.WORKERFS, {}, dirname) as FS.FSNode;
+
+    const nodes = new Map<string, FS.FSNode>();
+    nodes.set(dirname, mountNode);
+    const ensureParent = (path: string): FS.FSNode => {
+      const parts = path.split("/");
+      let currentNode: FS.FSNode = mountNode;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const partDirname = parts.slice(0, i + 1).join("/");
+        const part = parts[i];
+        if (!nodes.has(partDirname)) {
+          // Create the directory if it doesn't exist
+          // @ts-expect-error ts(2339)
+          const newNode = this.lib.WORKERFS.createNode(currentNode, part, this.lib.WORKERFS.DIR_MODE, 0) as FS.FSNode;
+          nodes.set(partDirname, newNode);
+        }
+        currentNode = nodes.get(partDirname)!;
+      }
+      return currentNode;
+    }
+    files.forEach((fileEntry) => {
+      const {file, path} = fileEntry;
+      const parentDir = ensureParent(path);
+      const fileName = path.split("/").pop()!;
+      const lastModifiedDate = file.lastModified ? new Date(file.lastModified) : undefined;
+      // @ts-expect-error ts(2339)
+      this.lib.WORKERFS.createNode(parentDir, fileName, this.lib.WORKERFS.FILE_MODE, 0, file, lastModifiedDate);
+    });
     return dirname;
   }
 
-  _mount_url(url: URL) {
+  _mountUrl(url: URL) {
     const dirname = `${_TMP_PREFIX}${randomString()}`;
     this.lib.FS.mkdir(dirname);
     this.lib.FS.mount(this.lib.MEMFS, {}, dirname)
@@ -288,6 +316,7 @@ self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
   try {
     await handleMessage(api, data);
   } catch (error) {
+    console.error("Error handling message:", error);
     doPostMessage(id, {type: "error", payload: {message: (error as Error).message}});
   }
 }
@@ -389,4 +418,21 @@ function timeout(ms: number): Promise<void> {
 
 function exhaustiveCheck(x: never): never {
   throw new Error(`Unexpected object: ${x}`);
+}
+
+
+function fileEntriesFromFilesOrFileEntries(file: File | File[] | FileEntry[]): FileEntry[] {
+  if (file instanceof File) {
+    return [{file, path: file.name}];
+  } else if (Array.isArray(file)) {
+    return file.map((f) => {
+      if (f instanceof File) {
+        return {file: f, path: f.name};
+      } else {
+        return f;
+      }
+    });
+  } else {
+    throw new Error("Invalid input type, expected File, File[], or FileEntry[]");
+  }
 }

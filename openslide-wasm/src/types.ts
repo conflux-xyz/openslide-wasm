@@ -1,8 +1,13 @@
 export type OpenSlideT = number;
 
+export interface FileEntry {
+  path: string;
+  file: File;
+}
+
 export type WorkerCommandBase =
   | {type: "init"}
-  | {type: "open", payload: {file: File | string}}
+  | {type: "open", payload: {file: File | File[] | FileEntry[] | string}}
   | {type: "close", payload: {osr: OpenSlideT}}
   | {type: "getPropertyNames", payload: {osr: OpenSlideT}}
   | {type: "getPropertyValue", payload: {osr: OpenSlideT, name: string}}
