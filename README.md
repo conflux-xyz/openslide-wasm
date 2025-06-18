@@ -106,7 +106,7 @@ Access-Control-Expose-Headers: Accept-Ranges, Content-Encoding, Content-Length
 
 ### Multi-File Formats
 
-While many WSI file formats are single-file, and therefore straightforward to use in a browser context, some format are multi-file, such as [DICOM](https://openslide.org/formats/dicom/), [MIRAX](https://openslide.org/formats/mirax/), and [Hamamatsu VMS and VMU](https://openslide.org/formats/hamamatsu/).
+While many WSI file formats are single-file, and therefore straightforward to use in a browser context, some formats are multi-file, such as [DICOM](https://openslide.org/formats/dicom/), [MIRAX](https://openslide.org/formats/mirax/), and [Hamamatsu VMS and VMU](https://openslide.org/formats/hamamatsu/).
 
 Support for these formats is provided by using the `File[]` or `FileEntry[]` types to `openSlide.open(...)`:
 
