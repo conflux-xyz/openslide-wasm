@@ -13,4 +13,5 @@ class RequestHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 if __name__ == "__main__":
-    HTTPServer(("localhost", 8080), RequestHandler).serve_forever()
+    port = os.getenv("PORT", "8080")
+    HTTPServer(("localhost", int(port)), RequestHandler).serve_forever()
