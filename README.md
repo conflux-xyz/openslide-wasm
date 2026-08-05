@@ -160,3 +160,9 @@ function getDicomFiles(files: File[]): File[] {
 We strive to support all WSI file formats that are supported by the OpenSlide C library.
 
 If you find a format that works with the OpenSlide C library but not with OpenSlideWASM, please file an issue, and, even better, submit a pull request!
+
+## License
+
+The code in this repository is licensed under the [MIT License](./LICENSE).
+
+Note that OpenSlideWASM compiles [OpenSlide](https://openslide.org/) and its dependencies (see [`get_external_deps.sh`](./get_external_deps.sh)) to WebAssembly. Those projects are distributed under their own licenses — notably OpenSlide and glib, which are LGPL v2.1 — and those terms continue to apply to the compiled artifacts.
